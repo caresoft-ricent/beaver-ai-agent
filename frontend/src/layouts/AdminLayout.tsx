@@ -8,6 +8,7 @@ import {
   ApartmentOutlined,
   ThunderboltOutlined,
   DashboardOutlined,
+  CommentOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   LogoutOutlined,
@@ -22,6 +23,8 @@ const menuItems = [
   { key: '/llm', icon: <RobotOutlined />, label: '大模型配置' },
   { key: '/ontology', icon: <ApartmentOutlined />, label: '业务本体' },
   { key: '/intents', icon: <ThunderboltOutlined />, label: '技能/意图' },
+  { type: 'divider' as const },
+  { key: '/chat', icon: <CommentOutlined />, label: '对话测试' },
 ];
 
 export default function AdminLayout() {

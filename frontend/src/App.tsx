@@ -9,6 +9,7 @@ import ConnectorList from './pages/ConnectorList';
 import LLMConfigList from './pages/LLMConfigList';
 import EntityList from './pages/EntityList';
 import SkillList from './pages/SkillList';
+import ChatPage from './pages/ChatPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('token');
@@ -29,6 +30,7 @@ function App() {
             <Route path="llm" element={<LLMConfigList />} />
             <Route path="ontology" element={<EntityList />} />
             <Route path="intents" element={<SkillList />} />
+            <Route path="chat" element={<ChatPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

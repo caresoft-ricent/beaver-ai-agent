@@ -114,3 +114,34 @@ def get_session_history(session_id: str, db: Session = Depends(get_db)):
         }
         for m in messages
     ])
+
+
+@router.get("/sessions")
+def list_sessions(
+    tenant_id: int = 1,
+    page: int = 1,
+    size: int = 20,
+    db: Session = Depends(get_db),
+):
+    """获取会话列表"""
+    query = (
+        db.query(ChatSession)
+        .filter(ChatSession.tenant_id == tenant_id)
+        .order_by(ChatSession.created_at.desc())
+    )
+    total = query.count()
+    items = query.offset((page - 1) * size).limit(size).all()
+    return ResponseBase(data={
+        "items": [
+            {
+                "session_id": s.session_id,
+                "customer_id": s.customer_id,
+                "customer_name": s.customer_name,
+                "message_count": s.message_count or 0,
+                "source": s.source,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+            }
+            for s in items
+        ],
+        "total": total,
+    })
