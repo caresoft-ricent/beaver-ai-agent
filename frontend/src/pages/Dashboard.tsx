@@ -1,6 +1,7 @@
 import { Card, Row, Col, Statistic, Spin } from 'antd';
 import { TeamOutlined, ApiOutlined, RobotOutlined, ThunderboltOutlined, ApartmentOutlined } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import client from '../api/client';
 
 interface Stats {
@@ -11,8 +12,17 @@ interface Stats {
   skills: number;
 }
 
+const cards: { key: keyof Stats; title: string; icon: React.ReactNode; route: string; span: number }[] = [
+  { key: 'tenants', title: '租户数', icon: <TeamOutlined />, route: '/tenants', span: 4 },
+  { key: 'connectors', title: '连接器', icon: <ApiOutlined />, route: '/connectors', span: 5 },
+  { key: 'llm_configs', title: '大模型配置', icon: <RobotOutlined />, route: '/llm', span: 5 },
+  { key: 'entities', title: '业务本体', icon: <ApartmentOutlined />, route: '/ontology', span: 5 },
+  { key: 'skills', title: '已发布技能', icon: <ThunderboltOutlined />, route: '/intents', span: 5 },
+];
+
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     client.get('/admin/stats').then((res) => setStats(res.data));
@@ -24,31 +34,17 @@ export default function Dashboard() {
     <>
       <h2>仪表盘</h2>
       <Row gutter={[16, 16]}>
-        <Col span={4}>
-          <Card>
-            <Statistic title="租户数" value={stats.tenants} prefix={<TeamOutlined />} />
-          </Card>
-        </Col>
-        <Col span={5}>
-          <Card>
-            <Statistic title="连接器" value={stats.connectors} prefix={<ApiOutlined />} />
-          </Card>
-        </Col>
-        <Col span={5}>
-          <Card>
-            <Statistic title="大模型配置" value={stats.llm_configs} prefix={<RobotOutlined />} />
-          </Card>
-        </Col>
-        <Col span={5}>
-          <Card>
-            <Statistic title="业务本体" value={stats.entities} prefix={<ApartmentOutlined />} />
-          </Card>
-        </Col>
-        <Col span={5}>
-          <Card>
-            <Statistic title="已发布技能" value={stats.skills} prefix={<ThunderboltOutlined />} />
-          </Card>
-        </Col>
+        {cards.map((c) => (
+          <Col span={c.span} key={c.key}>
+            <Card
+              hoverable
+              onClick={() => navigate(c.route)}
+              style={{ cursor: 'pointer' }}
+            >
+              <Statistic title={c.title} value={stats[c.key]} prefix={c.icon} />
+            </Card>
+          </Col>
+        ))}
       </Row>
     </>
   );

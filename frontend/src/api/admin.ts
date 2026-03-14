@@ -7,6 +7,13 @@ export const login = (data: { username: string; password: string }) =>
 export const initAdmin = (data: { username: string; password: string }) =>
   client.post('/admin/auth/init', data);
 
+export const changePassword = (data: { old_password: string; new_password: string }) =>
+  client.post('/admin/auth/change-password', data);
+
+// Chat Sessions
+export const deleteSession = (sessionId: string) =>
+  client.delete(`/v1/chat/sessions/${sessionId}`);
+
 // Tenants
 export const getTenants = (params?: { page?: number; size?: number }) =>
   client.get('/admin/tenants', { params });

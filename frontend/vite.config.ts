@@ -4,7 +4,10 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: '0.0.0.0',
     port: 3000,
+    // 🔥 新增下面这行（允许你的自定义域名）
+    allowedHosts: ['beaver-ai-agent.ricent.com'],
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8000',

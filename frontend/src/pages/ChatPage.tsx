@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  Layout, Input, Button, List, Typography, Space, Spin, Tag, Empty, theme,
+  Layout, Input, Button, List, Typography, Space, Spin, Tag, Empty, theme, Popconfirm, message,
 } from 'antd';
 import {
-  SendOutlined, PlusOutlined, MessageOutlined, UserOutlined, RobotOutlined,
+  SendOutlined, PlusOutlined, MessageOutlined, UserOutlined, RobotOutlined, DeleteOutlined,
 } from '@ant-design/icons';
 import client from '../api/client';
+import { deleteSession } from '../api/admin';
 
 const { Sider, Content } = Layout;
 const { Text, Paragraph } = Typography;
@@ -78,6 +79,22 @@ export default function ChatPage() {
     setMessages([]);
     setInputValue('');
     inputRef.current?.focus();
+  };
+
+  /* ─── Delete session ─── */
+  const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await deleteSession(sessionId);
+      message.success('会话已删除');
+      if (activeSession === sessionId) {
+        setActiveSession(null);
+        setMessages([]);
+      }
+      loadSessions();
+    } catch {
+      message.error('删除失败');
+    }
   };
 
   /* ─── Send message ─── */
@@ -177,12 +194,27 @@ export default function ChatPage() {
                   }}
                 >
                   <Space direction="vertical" size={0} style={{ width: '100%' }}>
-                    <Space>
-                      <MessageOutlined />
-                      <Text ellipsis style={{ maxWidth: 160 }}>
-                        {s.customer_name || s.customer_id}
-                      </Text>
-                    </Space>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Space>
+                        <MessageOutlined />
+                        <Text ellipsis style={{ maxWidth: 140 }}>
+                          {s.customer_name || s.customer_id}
+                        </Text>
+                      </Space>
+                      <Popconfirm
+                        title="确定删除该会话？"
+                        description="删除后不可恢复"
+                        onConfirm={(e) => handleDeleteSession(s.session_id, e as unknown as React.MouseEvent)}
+                        onCancel={(e) => e?.stopPropagation()}
+                        okText="删除"
+                        cancelText="取消"
+                      >
+                        <DeleteOutlined
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ color: themeToken.colorTextSecondary, fontSize: 13 }}
+                        />
+                      </Popconfirm>
+                    </div>
                     <Text type="secondary" style={{ fontSize: 12 }}>
                       {s.message_count} 条消息
                       {s.created_at && ` · ${s.created_at.slice(5, 16).replace('T', ' ')}`}

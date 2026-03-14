@@ -116,6 +116,19 @@ def get_session_history(session_id: str, db: Session = Depends(get_db)):
     ])
 
 
+@router.delete("/sessions/{session_id}")
+def delete_session(session_id: str, db: Session = Depends(get_db)):
+    """删除会话及其所有消息"""
+    session = db.query(ChatSession).filter(ChatSession.session_id == session_id).first()
+    if not session:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="会话不存在")
+    db.query(ChatMessage).filter(ChatMessage.session_id == session_id).delete()
+    db.delete(session)
+    db.commit()
+    return ResponseBase(message="会话已删除")
+
+
 @router.get("/sessions")
 def list_sessions(
     tenant_id: int = 1,
