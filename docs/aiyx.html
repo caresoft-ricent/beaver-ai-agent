@@ -1,0 +1,1351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>河狸云 AI 客户门户 - 前端UI原型</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #F5811F;
+            --primary-dark: #E06D0C;
+            --primary-light: #FFF4EB;
+            --ai-blue: #3B82F6;
+            --ai-purple: #8B5CF6;
+            --ai-gradient: linear-gradient(135deg, #8B5CF6, #3B82F6);
+            --text-dark: #1A1A1A;
+            --text-gray: #666666;
+            --text-light: #999999;
+            --bg-light: #F5F7FA;
+            --bg-dark: #1E1B4B;
+            --border: #E5E7EB;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --error: #EF4444;
+            --shadow: 0 4px 20px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 40px rgba(0,0,0,0.15);
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: #E5E7EB;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+        
+        /* ==================== 页面布局 ==================== */
+        .demo-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .demo-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .demo-header h1 {
+            font-size: 28px;
+            color: var(--text-dark);
+            margin-bottom: 10px;
+        }
+        
+        .demo-header p {
+            color: var(--text-gray);
+            font-size: 14px;
+        }
+        
+        .demo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        
+        .demo-section {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+        }
+        
+        .demo-section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-gray);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .demo-section-title::before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: var(--ai-gradient);
+            border-radius: 2px;
+        }
+        
+        /* ==================== 聊天窗口 - 浮窗模式 ==================== */
+        .chat-widget {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1000;
+        }
+        
+        .chat-trigger {
+            width: 60px;
+            height: 60px;
+            background: var(--ai-gradient);
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--shadow-lg);
+            transition: all 0.3s ease;
+        }
+        
+        .chat-trigger:hover {
+            transform: scale(1.1);
+        }
+        
+        .chat-trigger-icon {
+            font-size: 28px;
+        }
+        
+        .chat-trigger-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            width: 20px;
+            height: 20px;
+            background: var(--error);
+            border-radius: 50%;
+            color: white;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* ==================== 聊天窗口 - 主体 ==================== */
+        .chat-window {
+            width: 380px;
+            height: 580px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .chat-window.embedded {
+            width: 100%;
+            height: 500px;
+            box-shadow: none;
+            border: 1px solid var(--border);
+        }
+        
+        /* ==================== 聊天头部 ==================== */
+        .chat-header {
+            background: var(--ai-gradient);
+            color: white;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .chat-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .chat-avatar {
+            width: 44px;
+            height: 44px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        
+        .chat-info h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        
+        .chat-info p {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        
+        .chat-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .chat-status-dot {
+            width: 8px;
+            height: 8px;
+            background: #4ADE80;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .chat-header-right {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .chat-header-btn {
+            width: 32px;
+            height: 32px;
+            background: rgba(255,255,255,0.15);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        
+        .chat-header-btn:hover {
+            background: rgba(255,255,255,0.25);
+        }
+        
+        /* ==================== 消息区域 ==================== */
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: var(--bg-light);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #D1D5DB;
+            border-radius: 3px;
+        }
+        
+        /* ==================== 消息气泡 ==================== */
+        .message {
+            display: flex;
+            gap: 10px;
+            max-width: 85%;
+        }
+        
+        .message.user {
+            flex-direction: row-reverse;
+            align-self: flex-end;
+        }
+        
+        .message.assistant {
+            align-self: flex-start;
+        }
+        
+        .message-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        
+        .message.assistant .message-avatar {
+            background: var(--ai-gradient);
+            color: white;
+        }
+        
+        .message.user .message-avatar {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .message-content {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .message-bubble {
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .message.user .message-bubble {
+            background: var(--primary);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message.assistant .message-bubble {
+            background: white;
+            color: var(--text-dark);
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        
+        .message-time {
+            font-size: 11px;
+            color: var(--text-light);
+            padding: 0 4px;
+        }
+        
+        .message.user .message-time {
+            text-align: right;
+        }
+        
+        /* ==================== 结构化数据卡片 ==================== */
+        .data-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        
+        .data-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .data-card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .data-card-badge {
+            padding: 3px 8px;
+            border-radius: 100px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        
+        .data-card-badge.progress {
+            background: #DBEAFE;
+            color: #1D4ED8;
+        }
+        
+        .data-card-badge.success {
+            background: #D1FAE5;
+            color: #047857;
+        }
+        
+        .data-card-badge.warning {
+            background: #FEF3C7;
+            color: #B45309;
+        }
+        
+        /* 进度卡片 */
+        .progress-card {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        
+        .progress-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .progress-icon {
+            width: 28px;
+            height: 28px;
+            background: var(--bg-light);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        
+        .progress-info {
+            flex: 1;
+        }
+        
+        .progress-label {
+            font-size: 11px;
+            color: var(--text-light);
+        }
+        
+        .progress-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+        
+        /* 进度条 */
+        .progress-bar-container {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+        
+        .progress-bar-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+        
+        .progress-bar-label {
+            font-size: 12px;
+            color: var(--text-gray);
+        }
+        
+        .progress-bar-value {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--ai-blue);
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background: var(--bg-light);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--ai-gradient);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        /* 人员卡片 */
+        .staff-card {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .staff-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            background: var(--bg-light);
+            border-radius: 8px;
+        }
+        
+        .staff-item.leader {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1));
+            border: 1px solid rgba(139, 92, 246, 0.2);
+        }
+        
+        .staff-avatar {
+            width: 36px;
+            height: 36px;
+            background: var(--ai-gradient);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .staff-info {
+            flex: 1;
+        }
+        
+        .staff-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .staff-tag {
+            padding: 2px 6px;
+            background: var(--ai-purple);
+            color: white;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 500;
+        }
+        
+        .staff-dept {
+            font-size: 11px;
+            color: var(--text-light);
+        }
+        
+        .staff-phone {
+            font-size: 12px;
+            color: var(--ai-blue);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        /* 投诉状态卡片 */
+        .complaint-card {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .complaint-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .complaint-status-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        
+        .complaint-status-icon.pending {
+            background: #FEF3C7;
+        }
+        
+        .complaint-status-icon.done {
+            background: #D1FAE5;
+        }
+        
+        .complaint-status-info h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+        
+        .complaint-status-info p {
+            font-size: 12px;
+            color: var(--text-light);
+        }
+        
+        .complaint-detail {
+            padding: 12px;
+            background: var(--bg-light);
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        
+        .complaint-detail-item {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        
+        .complaint-detail-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .complaint-detail-label {
+            color: var(--text-light);
+            min-width: 60px;
+        }
+        
+        .complaint-detail-value {
+            color: var(--text-dark);
+            flex: 1;
+        }
+        
+        /* ==================== 快捷操作按钮 ==================== */
+        .quick-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        
+        .quick-action {
+            padding: 8px 14px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            font-size: 12px;
+            color: var(--text-gray);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .quick-action:hover {
+            border-color: var(--ai-purple);
+            color: var(--ai-purple);
+            background: rgba(139, 92, 246, 0.05);
+        }
+        
+        .quick-action.primary {
+            background: var(--ai-gradient);
+            border-color: transparent;
+            color: white;
+        }
+        
+        .quick-action.primary:hover {
+            opacity: 0.9;
+        }
+        
+        /* ==================== 输入区域 ==================== */
+        .chat-input-area {
+            padding: 16px 20px;
+            background: white;
+            border-top: 1px solid var(--border);
+        }
+        
+        .chat-input-wrapper {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+        
+        .chat-input-box {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            background: var(--bg-light);
+            border-radius: 24px;
+            padding: 4px 4px 4px 16px;
+            border: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+        
+        .chat-input-box:focus-within {
+            border-color: var(--ai-purple);
+            background: white;
+        }
+        
+        .chat-input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            font-size: 14px;
+            color: var(--text-dark);
+            outline: none;
+            padding: 8px 0;
+        }
+        
+        .chat-input::placeholder {
+            color: var(--text-light);
+        }
+        
+        .chat-input-actions {
+            display: flex;
+            gap: 4px;
+        }
+        
+        .chat-input-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: transparent;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-light);
+            transition: all 0.2s ease;
+        }
+        
+        .chat-input-btn:hover {
+            background: rgba(0,0,0,0.05);
+            color: var(--text-gray);
+        }
+        
+        .chat-send-btn {
+            width: 44px;
+            height: 44px;
+            background: var(--ai-gradient);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+        
+        .chat-send-btn:hover {
+            transform: scale(1.05);
+        }
+        
+        .chat-send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        /* ==================== 快捷入口 ==================== */
+        .chat-shortcuts {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .chat-shortcut {
+            padding: 6px 12px;
+            background: white;
+            border: 1px dashed var(--border);
+            border-radius: 16px;
+            font-size: 12px;
+            color: var(--text-gray);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .chat-shortcut:hover {
+            border-style: solid;
+            border-color: var(--ai-purple);
+            color: var(--ai-purple);
+        }
+        
+        /* ==================== 加载状态 ==================== */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 12px 16px;
+            background: white;
+            border-radius: 16px;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            width: fit-content;
+        }
+        
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--ai-purple);
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+        
+        .typing-dot:nth-child(1) { animation-delay: 0s; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-4px); opacity: 1; }
+        }
+        
+        /* ==================== 欢迎消息 ==================== */
+        .welcome-message {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .welcome-icon {
+            width: 64px;
+            height: 64px;
+            background: var(--ai-gradient);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            margin: 0 auto 16px;
+        }
+        
+        .welcome-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+        }
+        
+        .welcome-desc {
+            font-size: 13px;
+            color: var(--text-gray);
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        
+        .welcome-suggestions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .welcome-suggestion {
+            padding: 12px 16px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 13px;
+            color: var(--text-gray);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .welcome-suggestion:hover {
+            border-color: var(--ai-purple);
+            color: var(--ai-purple);
+            background: rgba(139, 92, 246, 0.03);
+        }
+        
+        .welcome-suggestion-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--bg-light);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        
+        /* ==================== 移动端适配 ==================== */
+        @media (max-width: 768px) {
+            .demo-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .chat-window {
+                width: 100%;
+                height: 100%;
+                border-radius: 0;
+            }
+            
+            .chat-widget {
+                bottom: 16px;
+                right: 16px;
+            }
+        }
+        
+        /* ==================== 确认弹窗 ==================== */
+        .confirm-card {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.05), rgba(59, 130, 246, 0.05));
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 8px;
+        }
+        
+        .confirm-card-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--ai-purple);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .confirm-card-content {
+            font-size: 13px;
+            color: var(--text-dark);
+            line-height: 1.8;
+            margin-bottom: 16px;
+        }
+        
+        .confirm-card-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .confirm-btn {
+            flex: 1;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .confirm-btn.primary {
+            background: var(--ai-gradient);
+            border: none;
+            color: white;
+        }
+        
+        .confirm-btn.secondary {
+            background: white;
+            border: 1px solid var(--border);
+            color: var(--text-gray);
+        }
+        
+        .confirm-btn:hover {
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <div class="demo-header">
+            <h1>🦫 河狸云 AI 客户门户 - UI原型</h1>
+            <p>以下组件可直接转换为React组件使用</p>
+        </div>
+        
+        <div class="demo-grid">
+            <!-- 左侧：完整聊天窗口 -->
+            <div class="demo-section">
+                <div class="demo-section-title">完整聊天窗口（嵌入模式）</div>
+                
+                <div class="chat-window embedded">
+                    <!-- 头部 -->
+                    <div class="chat-header">
+                        <div class="chat-header-left">
+                            <div class="chat-avatar">🤖</div>
+                            <div class="chat-info">
+                                <h3>河狸云 AI 助手</h3>
+                                <div class="chat-status">
+                                    <span class="chat-status-dot"></span>
+                                    <span>在线</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chat-header-right">
+                            <button class="chat-header-btn" title="最小化">─</button>
+                            <button class="chat-header-btn" title="关闭">✕</button>
+                        </div>
+                    </div>
+                    
+                    <!-- 消息区域 -->
+                    <div class="chat-messages">
+                        <!-- 欢迎消息 -->
+                        <div class="welcome-message">
+                            <div class="welcome-icon">🤖</div>
+                            <div class="welcome-title">您好！我是河狸云AI助手</div>
+                            <div class="welcome-desc">我可以帮您查询产线进度、现场人员、服务记录等，也可以帮您提交投诉或发起联系。</div>
+                            <div class="welcome-suggestions">
+                                <div class="welcome-suggestion">
+                                    <div class="welcome-suggestion-icon">📊</div>
+                                    <span>查看我的产线进度</span>
+                                </div>
+                                <div class="welcome-suggestion">
+                                    <div class="welcome-suggestion-icon">👥</div>
+                                    <span>现场有几个人在施工</span>
+                                </div>
+                                <div class="welcome-suggestion">
+                                    <div class="welcome-suggestion-icon">📝</div>
+                                    <span>我要反馈一个问题</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 输入区域 -->
+                    <div class="chat-input-area">
+                        <div class="chat-input-wrapper">
+                            <div class="chat-input-box">
+                                <input type="text" class="chat-input" placeholder="输入您的问题...">
+                                <div class="chat-input-actions">
+                                    <button class="chat-input-btn" title="语音输入">🎤</button>
+                                </div>
+                            </div>
+                            <button class="chat-send-btn">➤</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 右侧：对话示例 -->
+            <div class="demo-section">
+                <div class="demo-section-title">对话示例 - 进度查询</div>
+                
+                <div class="chat-window embedded">
+                    <div class="chat-header">
+                        <div class="chat-header-left">
+                            <div class="chat-avatar">🤖</div>
+                            <div class="chat-info">
+                                <h3>河狸云 AI 助手</h3>
+                                <div class="chat-status">
+                                    <span class="chat-status-dot"></span>
+                                    <span>在线</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-messages">
+                        <!-- 用户消息 -->
+                        <div class="message user">
+                            <div class="message-avatar">李</div>
+                            <div class="message-content">
+                                <div class="message-bubble">我的产线进度怎么样了？</div>
+                                <div class="message-time">14:32</div>
+                            </div>
+                        </div>
+                        
+                        <!-- AI回复 + 数据卡片 -->
+                        <div class="message assistant">
+                            <div class="message-avatar">🤖</div>
+                            <div class="message-content">
+                                <div class="message-bubble">您好！东莞生益25B1339-G产线当前状态：</div>
+                                
+                                <!-- 进度数据卡片 -->
+                                <div class="data-card">
+                                    <div class="data-card-header">
+                                        <div class="data-card-title">
+                                            <span>📊</span> 25B1339-G
+                                        </div>
+                                        <span class="data-card-badge progress">调试中</span>
+                                    </div>
+                                    <div class="progress-card">
+                                        <div class="progress-item">
+                                            <div class="progress-icon">📅</div>
+                                            <div class="progress-info">
+                                                <div class="progress-label">当前阶段</div>
+                                                <div class="progress-value">调试阶段</div>
+                                            </div>
+                                        </div>
+                                        <div class="progress-item">
+                                            <div class="progress-icon">📋</div>
+                                            <div class="progress-info">
+                                                <div class="progress-label">当前节点</div>
+                                                <div class="progress-value">槽体连接固定</div>
+                                            </div>
+                                        </div>
+                                        <div class="progress-item">
+                                            <div class="progress-icon">👷</div>
+                                            <div class="progress-info">
+                                                <div class="progress-label">现场人员</div>
+                                                <div class="progress-value">3人</div>
+                                            </div>
+                                        </div>
+                                        <div class="progress-item">
+                                            <div class="progress-icon">⚠️</div>
+                                            <div class="progress-info">
+                                                <div class="progress-label">预警</div>
+                                                <div class="progress-value" style="color: var(--success);">无逾期</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="progress-bar-container">
+                                        <div class="progress-bar-header">
+                                            <span class="progress-bar-label">整体进度</span>
+                                            <span class="progress-bar-value">65%</span>
+                                        </div>
+                                        <div class="progress-bar">
+                                            <div class="progress-bar-fill" style="width: 65%;"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 快捷操作 -->
+                                <div class="quick-actions">
+                                    <button class="quick-action">📋 查看详细节点</button>
+                                    <button class="quick-action">👤 联系负责人</button>
+                                </div>
+                                
+                                <div class="message-time">14:32</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input-area">
+                        <div class="chat-input-wrapper">
+                            <div class="chat-input-box">
+                                <input type="text" class="chat-input" placeholder="输入您的问题...">
+                            </div>
+                            <button class="chat-send-btn">➤</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 人员查询示例 -->
+            <div class="demo-section">
+                <div class="demo-section-title">对话示例 - 人员查询</div>
+                
+                <div class="chat-window embedded" style="height: 420px;">
+                    <div class="chat-header">
+                        <div class="chat-header-left">
+                            <div class="chat-avatar">🤖</div>
+                            <div class="chat-info">
+                                <h3>河狸云 AI 助手</h3>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-messages">
+                        <div class="message user">
+                            <div class="message-avatar">李</div>
+                            <div class="message-content">
+                                <div class="message-bubble">现场有几个人？负责人是谁？</div>
+                            </div>
+                        </div>
+                        
+                        <div class="message assistant">
+                            <div class="message-avatar">🤖</div>
+                            <div class="message-content">
+                                <div class="message-bubble">25B1339-G产线今日现场情况：</div>
+                                
+                                <div class="data-card">
+                                    <div class="data-card-header">
+                                        <div class="data-card-title">👥 现场人员 (3人)</div>
+                                    </div>
+                                    <div class="staff-card">
+                                        <div class="staff-item leader">
+                                            <div class="staff-avatar">黄</div>
+                                            <div class="staff-info">
+                                                <div class="staff-name">
+                                                    黄秋军
+                                                    <span class="staff-tag">负责人</span>
+                                                </div>
+                                                <div class="staff-dept">调试部</div>
+                                            </div>
+                                            <div class="staff-phone">📞 138****5678</div>
+                                        </div>
+                                        <div class="staff-item">
+                                            <div class="staff-avatar">张</div>
+                                            <div class="staff-info">
+                                                <div class="staff-name">张明</div>
+                                                <div class="staff-dept">调试部</div>
+                                            </div>
+                                        </div>
+                                        <div class="staff-item">
+                                            <div class="staff-avatar">王</div>
+                                            <div class="staff-info">
+                                                <div class="staff-name">王磊</div>
+                                                <div class="staff-dept">调试部</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="quick-actions">
+                                    <button class="quick-action primary">📞 联系负责人</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input-area">
+                        <div class="chat-input-wrapper">
+                            <div class="chat-input-box">
+                                <input type="text" class="chat-input" placeholder="输入您的问题...">
+                            </div>
+                            <button class="chat-send-btn">➤</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 投诉流程示例 -->
+            <div class="demo-section">
+                <div class="demo-section-title">对话示例 - 发起投诉</div>
+                
+                <div class="chat-window embedded" style="height: 420px;">
+                    <div class="chat-header">
+                        <div class="chat-header-left">
+                            <div class="chat-avatar">🤖</div>
+                            <div class="chat-info">
+                                <h3>河狸云 AI 助手</h3>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-messages">
+                        <div class="message user">
+                            <div class="message-avatar">李</div>
+                            <div class="message-content">
+                                <div class="message-bubble">我要投诉，上料机械手需要增加旋转功能</div>
+                            </div>
+                        </div>
+                        
+                        <div class="message assistant">
+                            <div class="message-avatar">🤖</div>
+                            <div class="message-content">
+                                <div class="message-bubble">收到，我来确认一下您的投诉信息：</div>
+                                
+                                <!-- 确认卡片 -->
+                                <div class="confirm-card">
+                                    <div class="confirm-card-title">📝 投诉信息确认</div>
+                                    <div class="confirm-card-content">
+                                        📍 产线：25B1339-G<br>
+                                        📝 问题：上料机械手需要增加旋转功能<br>
+                                        ⚡ 紧急程度：普通
+                                    </div>
+                                    <div class="confirm-card-actions">
+                                        <button class="confirm-btn secondary">修改</button>
+                                        <button class="confirm-btn primary">确认提交</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input-area">
+                        <div class="chat-input-wrapper">
+                            <div class="chat-input-box">
+                                <input type="text" class="chat-input" placeholder="输入您的问题...">
+                            </div>
+                            <button class="chat-send-btn">➤</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 投诉查询示例 -->
+            <div class="demo-section">
+                <div class="demo-section-title">对话示例 - 投诉进度查询</div>
+                
+                <div class="chat-window embedded" style="height: 400px;">
+                    <div class="chat-header">
+                        <div class="chat-header-left">
+                            <div class="chat-avatar">🤖</div>
+                            <div class="chat-info">
+                                <h3>河狸云 AI 助手</h3>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-messages">
+                        <div class="message user">
+                            <div class="message-avatar">李</div>
+                            <div class="message-content">
+                                <div class="message-bubble">我上周提的问题处理得怎样了？</div>
+                            </div>
+                        </div>
+                        
+                        <div class="message assistant">
+                            <div class="message-avatar">🤖</div>
+                            <div class="message-content">
+                                <div class="message-bubble">您的投诉已处理完成：</div>
+                                
+                                <div class="data-card">
+                                    <div class="complaint-card">
+                                        <div class="complaint-status">
+                                            <div class="complaint-status-icon done">✅</div>
+                                            <div class="complaint-status-info">
+                                                <h4>CP202601280001</h4>
+                                                <p>已完成 · 2026-01-30</p>
+                                            </div>
+                                        </div>
+                                        <div class="complaint-detail">
+                                            <div class="complaint-detail-item">
+                                                <span class="complaint-detail-label">问题：</span>
+                                                <span class="complaint-detail-value">上料机械手增加旋转</span>
+                                            </div>
+                                            <div class="complaint-detail-item">
+                                                <span class="complaint-detail-label">处理人：</span>
+                                                <span class="complaint-detail-value">黄秋军</span>
+                                            </div>
+                                            <div class="complaint-detail-item">
+                                                <span class="complaint-detail-label">结果：</span>
+                                                <span class="complaint-detail-value">已增加旋转程序，清洁喷头</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="quick-actions">
+                                    <button class="quick-action">📄 查看服务报告</button>
+                                    <button class="quick-action">💬 继续反馈</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input-area">
+                        <div class="chat-input-wrapper">
+                            <div class="chat-input-box">
+                                <input type="text" class="chat-input" placeholder="输入您的问题...">
+                            </div>
+                            <button class="chat-send-btn">➤</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 加载状态 -->
+            <div class="demo-section">
+                <div class="demo-section-title">组件状态</div>
+                
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <!-- 正在输入 -->
+                    <div>
+                        <p style="font-size: 12px; color: var(--text-gray); margin-bottom: 8px;">AI正在输入...</p>
+                        <div class="message assistant" style="max-width: 100%;">
+                            <div class="message-avatar">🤖</div>
+                            <div class="typing-indicator">
+                                <div class="typing-dot"></div>
+                                <div class="typing-dot"></div>
+                                <div class="typing-dot"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 快捷入口 -->
+                    <div>
+                        <p style="font-size: 12px; color: var(--text-gray); margin-bottom: 8px;">快捷入口（输入框下方）</p>
+                        <div class="chat-shortcuts">
+                            <span class="chat-shortcut">📊 查进度</span>
+                            <span class="chat-shortcut">👥 查人员</span>
+                            <span class="chat-shortcut">📋 查服务</span>
+                            <span class="chat-shortcut">📝 提投诉</span>
+                            <span class="chat-shortcut">📞 联系人</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 浮窗按钮 -->
+                    <div>
+                        <p style="font-size: 12px; color: var(--text-gray); margin-bottom: 8px;">浮窗触发按钮</p>
+                        <div style="position: relative; height: 80px;">
+                            <div style="position: absolute; right: 0; bottom: 0;">
+                                <button class="chat-trigger">
+                                    <span class="chat-trigger-icon">💬</span>
+                                    <span class="chat-trigger-badge">2</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

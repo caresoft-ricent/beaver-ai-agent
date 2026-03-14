@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>河狸云 AI 客户门户 - 让您的客户用对话了解交付进度</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #F5811F;
+            --primary-dark: #E06D0C;
+            --primary-light: #FFF4EB;
+            --secondary: #1A2942;
+            --text-dark: #1A1A1A;
+            --text-gray: #666666;
+            --bg-light: #F8F9FA;
+            --bg-dark: #0D1520;
+            --ai-blue: #3B82F6;
+            --ai-purple: #8B5CF6;
+            --success: #10B981;
+        }
+        
+        body {
+            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+            line-height: 1.6;
+            color: var(--text-dark);
+            background: #E8E8E8;
+        }
+        
+        .brochure {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 0 60px rgba(0,0,0,0.15);
+        }
+        
+        /* ========== Hero ========== */
+        .hero {
+            background: linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #4C1D95 100%);
+            color: white;
+            padding: 50px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -100px;
+            right: -100px;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, transparent 70%);
+        }
+        
+        .hero::after {
+            content: '';
+            position: absolute;
+            bottom: -150px;
+            left: -100px;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.2) 0%, transparent 70%);
+        }
+        
+        .hero-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        
+        .logo-icon {
+            width: 52px;
+            height: 52px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+        }
+        
+        .logo-text {
+            font-size: 24px;
+            font-weight: 700;
+        }
+        
+        .logo-text span {
+            display: block;
+            font-size: 10px;
+            font-weight: 400;
+            opacity: 0.7;
+            letter-spacing: 3px;
+            margin-top: 2px;
+        }
+        
+        .hero-badge {
+            padding: 8px 18px;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(59, 130, 246, 0.3));
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 100px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .hero-badge .ai-icon {
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(135deg, var(--ai-purple), var(--ai-blue));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+        }
+        
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            align-items: center;
+        }
+        
+        .hero-left h1 {
+            font-size: 38px;
+            font-weight: 700;
+            line-height: 1.3;
+            margin-bottom: 16px;
+        }
+        
+        .hero-left h1 em {
+            font-style: normal;
+            background: linear-gradient(135deg, var(--ai-purple), var(--ai-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .hero-subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+            line-height: 1.8;
+            margin-bottom: 20px;
+        }
+        
+        .hero-features {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .hero-feature {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 100px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        /* Chat Preview */
+        .chat-preview {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+        
+        .chat-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 15px;
+        }
+        
+        .chat-avatar {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--ai-purple), var(--ai-blue));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        
+        .chat-title {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .chat-subtitle {
+            font-size: 11px;
+            opacity: 0.7;
+        }
+        
+        .chat-messages {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .chat-msg {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        
+        .chat-msg.user {
+            align-self: flex-end;
+            background: var(--primary);
+            border-bottom-right-radius: 4px;
+        }
+        
+        .chat-msg.ai {
+            align-self: flex-start;
+            background: rgba(255,255,255,0.15);
+            border-bottom-left-radius: 4px;
+        }
+        
+        .chat-msg .highlight {
+            color: #A5F3FC;
+            font-weight: 600;
+        }
+        
+        .chat-input {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .chat-input input {
+            flex: 1;
+            padding: 10px 14px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 100px;
+            color: white;
+            font-size: 13px;
+            outline: none;
+        }
+        
+        .chat-input input::placeholder {
+            color: rgba(255,255,255,0.5);
+        }
+        
+        .chat-input button {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--ai-purple), var(--ai-blue));
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        /* ========== Section Common ========== */
+        .section {
+            padding: 50px;
+        }
+        
+        .section-tag {
+            display: inline-block;
+            padding: 5px 14px;
+            background: var(--primary-light);
+            color: var(--primary);
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 100px;
+            margin-bottom: 10px;
+        }
+        
+        .section-tag.ai {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(59, 130, 246, 0.15));
+            color: var(--ai-purple);
+        }
+        
+        .section-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--secondary);
+            margin-bottom: 6px;
+        }
+        
+        .section-subtitle {
+            font-size: 14px;
+            color: var(--text-gray);
+            margin-bottom: 30px;
+        }
+        
+        /* ========== Value Props ========== */
+        .value-section {
+            background: var(--bg-light);
+        }
+        
+        .value-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+        
+        .value-card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+        
+        .value-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+        }
+        
+        .value-icon {
+            width: 70px;
+            height: 70px;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.1));
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+        }
+        
+        .value-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--secondary);
+            margin-bottom: 10px;
+        }
+        
+        .value-desc {
+            font-size: 13px;
+            color: var(--text-gray);
+            line-height: 1.7;
+        }
+        
+        /* ========== Capabilities ========== */
+        .cap-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+        
+        .cap-card {
+            display: flex;
+            gap: 16px;
+            padding: 20px;
+            background: var(--bg-light);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+        
+        .cap-card:hover {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(59, 130, 246, 0.08));
+        }
+        
+        .cap-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--ai-purple), var(--ai-blue));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+        
+        .cap-content {
+            flex: 1;
+        }
+        
+        .cap-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--secondary);
+            margin-bottom: 6px;
+        }
+        
+        .cap-desc {
+            font-size: 12px;
+            color: var(--text-gray);
+            line-height: 1.6;
+        }
+        
+        .cap-example {
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 8px;
+            font-size: 12px;
+            color: var(--ai-purple);
+            font-style: italic;
+        }
+        
+        /* ========== Architecture ========== */
+        .arch-section {
+            background: linear-gradient(135deg, #1E1B4B 0%, #312E81 100%);
+            color: white;
+        }
+        
+        .arch-section .section-title {
+            color: white;
+        }
+        
+        .arch-section .section-subtitle {
+            color: rgba(255,255,255,0.7);
+        }
+        
+        .arch-diagram {
+            background: rgba(255,255,255,0.05);
+            border-radius: 20px;
+            padding: 30px;
+        }
+        
+        .arch-flow {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .arch-step {
+            text-align: center;
+        }
+        
+        .arch-step-icon {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 12px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        
+        .arch-step.highlight .arch-step-icon {
+            background: linear-gradient(135deg, var(--ai-purple), var(--ai-blue));
+            border-color: transparent;
+        }
+        
+        .arch-step-title {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .arch-step-desc {
+            font-size: 11px;
+            opacity: 0.7;
+        }
+        
+        .arch-arrow {
+            text-align: center;
+            font-size: 24px;
+            opacity: 0.4;
+        }
+        
+        .arch-layers {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 30px;
+        }
+        
+        .arch-layer {
+            background: rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .arch-layer-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .arch-layer-title span {
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(135deg, var(--ai-purple), var(--ai-blue));
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+        
+        .arch-layer-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        
+        .arch-layer-item {
+            padding: 4px 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 100px;
+            font-size: 11px;
+        }
+        
+        /* ========== Scenarios ========== */
+        .scenario-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+        
+        .scenario-card {
+            background: white;
+            border: 1px solid #E5E7EB;
+            border-radius: 16px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .scenario-card:hover {
+            border-color: var(--ai-purple);
+            box-shadow: 0 4px 20px rgba(139, 92, 246, 0.15);
+        }
+        
+        .scenario-header {
+            padding: 20px;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(59, 130, 246, 0.08));
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        
+        .scenario-icon {
+            width: 50px;
+            height: 50px;
+            background: white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .scenario-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--secondary);
+        }
+        
+        .scenario-subtitle {
+            font-size: 12px;
+            color: var(--text-gray);
+        }
+        
+        .scenario-content {
+            padding: 20px;
+        }
+        
+        .scenario-chat {
+            background: var(--bg-light);
+            border-radius: 12px;
+            padding: 15px;
+        }
+        
+        .scenario-q, .scenario-a {
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        
+        .scenario-q {
+            color: var(--text-gray);
+        }
+        
+        .scenario-q::before {
+            content: '👤 ';
+        }
+        
+        .scenario-a {
+            color: var(--ai-purple);
+        }
+        
+        .scenario-a::before {
+            content: '🤖 ';
+        }
+        
+        .scenario-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        
+        .scenario-action {
+            padding: 6px 12px;
+            background: white;
+            border: 1px solid #E5E7EB;
+            border-radius: 100px;
+            font-size: 11px;
+            color: var(--text-gray);
+        }
+        
+        /* ========== CTA ========== */
+        .cta-section {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            padding: 50px;
+            color: white;
+        }
+        
+        .cta-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .cta-left {
+            flex: 1;
+        }
+        
+        .cta-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        .cta-desc {
+            font-size: 15px;
+            opacity: 0.95;
+            margin-bottom: 20px;
+        }
+        
+        .cta-phone {
+            font-size: 28px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .cta-links {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 10px;
+        }
+        
+        .cta-right {
+            text-align: center;
+        }
+        
+        .cta-qr {
+            background: white;
+            border-radius: 16px;
+            padding: 16px;
+        }
+        
+        .cta-qr-placeholder {
+            width: 120px;
+            height: 120px;
+            background: var(--bg-light);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: var(--text-gray);
+        }
+        
+        .cta-qr-text {
+            font-size: 12px;
+            color: var(--text-gray);
+            margin-top: 8px;
+        }
+        
+        /* ========== Footer ========== */
+        .footer {
+            background: var(--bg-dark);
+            padding: 25px 50px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: rgba(255,255,255,0.6);
+            font-size: 12px;
+        }
+        
+        .footer-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .footer-logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        
+        .footer-logo-text {
+            font-size: 14px;
+            font-weight: 600;
+            color: white;
+        }
+        
+        .footer-badges {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .footer-badge {
+            padding: 4px 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            font-size: 10px;
+            color: rgba(255,255,255,0.7);
+            text-decoration: none;
+        }
+        
+        @media (max-width: 768px) {
+            .hero, .section, .cta-section { padding: 35px 25px; }
+            .hero-content { grid-template-columns: 1fr; }
+            .chat-preview { margin-top: 30px; }
+            .hero-left h1 { font-size: 28px; }
+            .value-grid, .cap-grid, .scenario-grid { grid-template-columns: 1fr; }
+            .arch-flow { grid-template-columns: 1fr; gap: 20px; }
+            .arch-arrow { transform: rotate(90deg); }
+            .arch-layers { grid-template-columns: 1fr; }
+            .cta-content { flex-direction: column; gap: 30px; text-align: center; }
+            .footer { flex-direction: column; gap: 15px; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="brochure">
+        <!-- Hero -->
+        <section class="hero">
+            <div class="hero-header">
+                <div class="logo">
+                    <div class="logo-icon">🦫</div>
+                    <div class="logo-text">
+                        河狸云
+                        <span>BEAVER CLOUD</span>
+                    </div>
+                </div>
+                <div class="hero-badge">
+                    <span class="ai-icon">✨</span>
+                    AI 客户门户
+                </div>
+            </div>
+            
+            <div class="hero-content">
+                <div class="hero-left">
+                    <h1>让您的客户<br>用<em>对话</em>了解交付进度</h1>
+                    <p class="hero-subtitle">基于业务本体的 AI 智能问答，您的客户无需学习系统操作，只需用自然语言提问，即可获取进度、人员、服务等全部信息</p>
+                    <div class="hero-features">
+                        <span class="hero-feature">💬 自然语言交互</span>
+                        <span class="hero-feature">📊 实时数据查询</span>
+                        <span class="hero-feature">📝 直接发起工单</span>
+                    </div>
+                </div>
+                
+                <div class="chat-preview">
+                    <div class="chat-header">
+                        <div class="chat-avatar">🤖</div>
+                        <div>
+                            <div class="chat-title">河狸云 AI 助手</div>
+                            <div class="chat-subtitle">随时为您解答交付相关问题</div>
+                        </div>
+                    </div>
+                    <div class="chat-messages">
+                        <div class="chat-msg user">我的产线进度怎么样了？</div>
+                        <div class="chat-msg ai">
+                            您好！东莞生益25B1339-G产线当前状态：<br><br>
+                            📊 整体进度：<span class="highlight">安装100%</span> 完成<br>
+                            📅 当前阶段：调试阶段，进行中<br>
+                            👷 现场人员：3人（调试部）<br>
+                            ⚠️ 预警：无逾期节点
+                        </div>
+                        <div class="chat-msg user">我要发起一个联系单</div>
+                        <div class="chat-msg ai">
+                            好的，请描述您的联系单内容，我来帮您提交申请 📝
+                        </div>
+                    </div>
+                    <div class="chat-input">
+                        <input type="text" placeholder="输入您的问题...">
+                        <button>→</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Value Props -->
+        <section class="section value-section">
+            <div style="text-align: center; margin-bottom: 40px;">
+                <span class="section-tag ai">核心价值</span>
+                <h2 class="section-title">为什么选择 AI 客户门户</h2>
+                <p class="section-subtitle">从"客户找信息"到"信息找客户"</p>
+            </div>
+            
+            <div class="value-grid">
+                <div class="value-card">
+                    <div class="value-icon">🎯</div>
+                    <div class="value-title">零学习成本</div>
+                    <div class="value-desc">客户无需学习系统操作，用自然语言提问即可获取所需信息，像和真人对话一样简单</div>
+                </div>
+                <div class="value-card">
+                    <div class="value-icon">⚡</div>
+                    <div class="value-title">即时响应</div>
+                    <div class="value-desc">7×24小时自动响应客户咨询，无需等待人工回复，大幅减少沟通成本</div>
+                </div>
+                <div class="value-card">
+                    <div class="value-icon">🔄</div>
+                    <div class="value-title">闭环服务</div>
+                    <div class="value-desc">不只是查询，客户可以直接在对话中发起投诉、变更申请、联系单等业务动作</div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Capabilities -->
+        <section class="section">
+            <span class="section-tag ai">AI 能力</span>
+            <h2 class="section-title">您的客户可以问什么</h2>
+            <p class="section-subtitle">基于业务本体的智能问答，覆盖交付全流程</p>
+            
+            <div class="cap-grid">
+                <div class="cap-card">
+                    <div class="cap-icon">📊</div>
+                    <div class="cap-content">
+                        <div class="cap-title">进度查询</div>
+                        <div class="cap-desc">实时查看产线整体进度、各阶段完成情况、逾期预警等</div>
+                        <div class="cap-example">"我的产线现在到哪个阶段了？"</div>
+                    </div>
+                </div>
+                <div class="cap-card">
+                    <div class="cap-icon">👷</div>
+                    <div class="cap-content">
+                        <div class="cap-title">人员查询</div>
+                        <div class="cap-desc">了解现场人员配置、工时情况、负责人信息等</div>
+                        <div class="cap-example">"现场有多少人在施工？"</div>
+                    </div>
+                </div>
+                <div class="cap-card">
+                    <div class="cap-icon">🔧</div>
+                    <div class="cap-content">
+                        <div class="cap-title">服务跟踪</div>
+                        <div class="cap-desc">查看服务报告、历史记录、处理结果等</div>
+                        <div class="cap-example">"上次的服务报告在哪？"</div>
+                    </div>
+                </div>
+                <div class="cap-card">
+                    <div class="cap-icon">📋</div>
+                    <div class="cap-content">
+                        <div class="cap-title">投诉追踪</div>
+                        <div class="cap-desc">了解投诉处理进度、责任人、预计完成时间等</div>
+                        <div class="cap-example">"我上周提的问题处理得怎样了？"</div>
+                    </div>
+                </div>
+                <div class="cap-card">
+                    <div class="cap-icon">📝</div>
+                    <div class="cap-content">
+                        <div class="cap-title">发起联系单</div>
+                        <div class="cap-desc">直接在对话中发起变更申请、投诉、咨询等</div>
+                        <div class="cap-example">"我要申请工艺变更"</div>
+                    </div>
+                </div>
+                <div class="cap-card">
+                    <div class="cap-icon">⚠️</div>
+                    <div class="cap-content">
+                        <div class="cap-title">风险预警</div>
+                        <div class="cap-desc">主动提醒逾期风险、异常情况、待确认事项等</div>
+                        <div class="cap-example">"有没有需要我确认的事项？"</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Architecture -->
+        <section class="section arch-section">
+            <div style="text-align: center; margin-bottom: 40px;">
+                <span class="section-tag" style="background: rgba(255,255,255,0.15); color: white;">技术架构</span>
+                <h2 class="section-title">基于业务本体的 AI 架构</h2>
+                <p class="section-subtitle">AI 不是独立工具，而是嵌入业务的能力层</p>
+            </div>
+            
+            <div class="arch-diagram">
+                <div class="arch-flow">
+                    <div class="arch-step">
+                        <div class="arch-step-icon">💬</div>
+                        <div class="arch-step-title">自然语言</div>
+                        <div class="arch-step-desc">客户提问</div>
+                    </div>
+                    <div class="arch-arrow">→</div>
+                    <div class="arch-step highlight">
+                        <div class="arch-step-icon">🧠</div>
+                        <div class="arch-step-title">AI 理解</div>
+                        <div class="arch-step-desc">意图识别</div>
+                    </div>
+                    <div class="arch-arrow">→</div>
+                    <div class="arch-step">
+                        <div class="arch-step-icon">🔍</div>
+                        <div class="arch-step-title">本体查询</div>
+                        <div class="arch-step-desc">数据检索</div>
+                    </div>
+                    <div class="arch-arrow">→</div>
+                    <div class="arch-step">
+                        <div class="arch-step-icon">📄</div>
+                        <div class="arch-step-title">生成回答</div>
+                        <div class="arch-step-desc">结果呈现</div>
+                    </div>
+                    <div class="arch-arrow">→</div>
+                    <div class="arch-step highlight">
+                        <div class="arch-step-icon">✅</div>
+                        <div class="arch-step-title">执行动作</div>
+                        <div class="arch-step-desc">业务闭环</div>
+                    </div>
+                </div>
+                
+                <div class="arch-layers">
+                    <div class="arch-layer">
+                        <div class="arch-layer-title">
+                            <span>1</span>
+                            业务本体层
+                        </div>
+                        <div class="arch-layer-items">
+                            <span class="arch-layer-item">客户</span>
+                            <span class="arch-layer-item">产线</span>
+                            <span class="arch-layer-item">交付节点</span>
+                            <span class="arch-layer-item">现场人员</span>
+                            <span class="arch-layer-item">服务工单</span>
+                            <span class="arch-layer-item">投诉记录</span>
+                        </div>
+                    </div>
+                    <div class="arch-layer">
+                        <div class="arch-layer-title">
+                            <span>2</span>
+                            AI 能力层
+                        </div>
+                        <div class="arch-layer-items">
+                            <span class="arch-layer-item">意图识别</span>
+                            <span class="arch-layer-item">实体抽取</span>
+                            <span class="arch-layer-item">知识问答</span>
+                            <span class="arch-layer-item">动作执行</span>
+                            <span class="arch-layer-item">上下文管理</span>
+                        </div>
+                    </div>
+                    <div class="arch-layer">
+                        <div class="arch-layer-title">
+                            <span>3</span>
+                            交互层
+                        </div>
+                        <div class="arch-layer-items">
+                            <span class="arch-layer-item">Web门户</span>
+                            <span class="arch-layer-item">微信小程序</span>
+                            <span class="arch-layer-item">H5页面</span>
+                            <span class="arch-layer-item">API接口</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Scenarios -->
+        <section class="section">
+            <span class="section-tag ai">应用场景</span>
+            <h2 class="section-title">真实场景示例</h2>
+            <p class="section-subtitle">看看您的客户如何使用 AI 客户门户</p>
+            
+            <div class="scenario-grid">
+                <div class="scenario-card">
+                    <div class="scenario-header">
+                        <div class="scenario-icon">📊</div>
+                        <div>
+                            <div class="scenario-title">查看整体进度</div>
+                            <div class="scenario-subtitle">客户了解项目全貌</div>
+                        </div>
+                    </div>
+                    <div class="scenario-content">
+                        <div class="scenario-chat">
+                            <div class="scenario-q">我有几条产线在施工？整体进度怎么样？</div>
+                            <div class="scenario-a">您目前有2条产线在建：<br>• 25B1339-G：安装100%，调试进行中<br>• 25B1340-G：安装进行中，完成65%</div>
+                        </div>
+                        <div class="scenario-actions">
+                            <span class="scenario-action">查看详细进度</span>
+                            <span class="scenario-action">导出报告</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="scenario-card">
+                    <div class="scenario-header">
+                        <div class="scenario-icon">🔧</div>
+                        <div>
+                            <div class="scenario-title">追踪问题处理</div>
+                            <div class="scenario-subtitle">客户跟进投诉进度</div>
+                        </div>
+                    </div>
+                    <div class="scenario-content">
+                        <div class="scenario-chat">
+                            <div class="scenario-q">上周报的机械手问题处理得怎么样了？</div>
+                            <div class="scenario-a">您的问题（编号SP202601030001）已处理完成：<br>• 问题：上料机械手增加旋转<br>• 处理：已增加旋转程序，清洁喷头<br>• 服务工时：24小时</div>
+                        </div>
+                        <div class="scenario-actions">
+                            <span class="scenario-action">查看服务报告</span>
+                            <span class="scenario-action">确认关闭</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="scenario-card">
+                    <div class="scenario-header">
+                        <div class="scenario-icon">📝</div>
+                        <div>
+                            <div class="scenario-title">发起变更申请</div>
+                            <div class="scenario-subtitle">客户直接发起业务动作</div>
+                        </div>
+                    </div>
+                    <div class="scenario-content">
+                        <div class="scenario-chat">
+                            <div class="scenario-q">我需要申请一个工艺参数变更</div>
+                            <div class="scenario-a">好的，我来帮您创建变更申请。请问：<br>1. 涉及哪条产线？<br>2. 变更内容是什么？<br>3. 期望完成时间？</div>
+                        </div>
+                        <div class="scenario-actions">
+                            <span class="scenario-action">填写变更单</span>
+                            <span class="scenario-action">联系负责人</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="scenario-card">
+                    <div class="scenario-header">
+                        <div class="scenario-icon">👷</div>
+                        <div>
+                            <div class="scenario-title">了解现场情况</div>
+                            <div class="scenario-subtitle">客户掌握人员动态</div>
+                        </div>
+                    </div>
+                    <div class="scenario-content">
+                        <div class="scenario-chat">
+                            <div class="scenario-q">今天现场有多少人？负责人是谁？</div>
+                            <div class="scenario-a">25B1339-G产线今日现场情况：<br>• 现场人员：3人<br>• 负责人：黄秋军（调试部）<br>• 工作内容：调试复查<br>• 联系方式：138****5678</div>
+                        </div>
+                        <div class="scenario-actions">
+                            <span class="scenario-action">联系负责人</span>
+                            <span class="scenario-action">查看工时</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- CTA -->
+        <section class="cta-section">
+            <div class="cta-content">
+                <div class="cta-left">
+                    <h2 class="cta-title">开启 AI 客户门户</h2>
+                    <p class="cta-desc">让您的客户用对话了解交付进度<br>提升服务体验，建立品牌信任</p>
+                    <div class="cta-phone">📞 133 1652 6951</div>
+                    <div class="cta-links">🌐 www1.ricent.com</div>
+                </div>
+                <div class="cta-right">
+                    <div class="cta-qr">
+                        <div class="cta-qr-placeholder">扫码咨询</div>
+                        <div class="cta-qr-text">扫码了解更多</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-logo">
+                <div class="footer-logo-icon">🦫</div>
+                <span class="footer-logo-text">河狸云 BEAVER CLOUD</span>
+            </div>
+            <div>© 2016-2026 深圳瑞信建筑科技有限公司</div>
+            <div class="footer-badges">
+                <a href="https://szridge.com/" target="_blank" class="footer-badge">股东：深圳瑞捷</a>
+                <a href="https://www.szvc.com.cn/" target="_blank" class="footer-badge">股东：深创投</a>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>
