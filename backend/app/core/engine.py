@@ -68,6 +68,11 @@ class DialogEngine:
             .all()
         )
 
+        # 无工具链的技能（如闲聊）直接返回模板
+        if not tools:
+            result.reply = matched_skill.response_template or "您好！请问有什么可以帮助您的？"
+            return result
+
         # Step 4: 按顺序执行工具链
         query_results = {}
         for tool in tools:
@@ -96,21 +101,36 @@ class DialogEngine:
         return result
 
     def _recognize_intent(self, message: str, skills: list[Skill]):
-        """意图识别 - 规则优先，LLM兜底"""
-        # 策略1: 关键词/正则匹配
+        """意图识别 - 规则优先(多关键词得分排序)，LLM兜底"""
+        # 策略1: 关键词/正则匹配 — 按命中关键词数排序
+        candidates = []
         for skill in skills:
-            # 关键词匹配
+            score = 0
+            hit_count = 0
+            entities = {}
+
+            # 关键词得分
             keywords = skill.match_keywords or []
             for kw in keywords:
                 if kw in message:
-                    return skill, 0.95, {}
+                    hit_count += 1
+            if hit_count > 0:
+                score = 0.7 + min(hit_count * 0.1, 0.28)  # 1kw=0.8, 2kw=0.9, 3kw+=0.98
 
-            # 正则匹配
+            # 正则匹配(额外加分)
             patterns = skill.match_patterns or []
             for pattern in patterns:
                 match = re.search(pattern, message)
                 if match:
-                    return skill, 0.9, match.groupdict()
+                    score = max(score, 0.9)
+                    entities.update(match.groupdict())
+
+            if score > 0:
+                candidates.append((skill, score, entities))
+
+        if candidates:
+            candidates.sort(key=lambda x: x[1], reverse=True)
+            return candidates[0]
 
         # 策略2: LLM意图识别
         llm_config = self._get_llm_config("intent")
@@ -212,7 +232,7 @@ class DialogEngine:
         """用LLM基于数据生成自然语言回答"""
         llm_config = self._get_llm_config("response")
         if not llm_config:
-            return json.dumps(data, ensure_ascii=False, indent=2)
+            return self._format_data_as_text(data)
 
         prompt = skill.response_prompt or "请根据以下数据，用友好的中文回答用户的问题。"
         data_str = json.dumps(data, ensure_ascii=False, indent=2)
@@ -232,7 +252,34 @@ class DialogEngine:
             )
             return result["content"]
         except Exception:
-            return json.dumps(data, ensure_ascii=False, indent=2)
+            return self._format_data_as_text(data)
+
+    def _format_data_as_text(self, data: dict) -> str:
+        """无LLM时将结构化数据格式化为可读文本"""
+        lines = []
+        for _key, value in data.items():
+            if not isinstance(value, dict):
+                continue
+            source = value.get("source", "api")
+            raw = value.get("data", {})
+            # 处理嵌套 {data: {items: [...]}} 或直接 {items: [...]}
+            items = None
+            if isinstance(raw, dict):
+                inner = raw.get("data", raw)
+                if isinstance(inner, dict):
+                    items = inner.get("items", None)
+            if isinstance(items, list):
+                lines.append(f"为您查到 {len(items)} 条记录：\n")
+                for i, item in enumerate(items, 1):
+                    parts = []
+                    for k, v in item.items():
+                        parts.append(f"{k}: {v}")
+                    lines.append(f"{i}. " + ", ".join(parts))
+                if source == "mock":
+                    lines.append("\n（当前为演示数据）")
+            else:
+                lines.append(json.dumps(raw, ensure_ascii=False, indent=2))
+        return "\n".join(lines) if lines else "查询完成，暂无更多信息。"
 
     def _get_llm_config(self, usage: str) -> Optional[LLMConfig]:
         """获取指定用途的LLM配置"""

@@ -45,6 +45,3 @@ class ActionParameter(Base):
     default_value = Column(String(256), comment="默认值")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-
-
-from sqlalchemy import Boolean  # noqa: E402 (already imported above in Column list)
