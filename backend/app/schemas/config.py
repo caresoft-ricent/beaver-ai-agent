@@ -83,6 +83,8 @@ class ConnectorOut(BaseModel):
     type: str
     base_url: str
     auth_type: str
+    auth_config: Optional[dict] = None
+    health_check_path: Optional[str] = None
     timeout: int
     mock_enabled: str
     status: str

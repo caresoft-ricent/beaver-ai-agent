@@ -76,17 +76,21 @@ def test_connector(connector_id: int, db: Session = Depends(get_db)):
     if not conn:
         raise HTTPException(status_code=404, detail="连接器不存在")
 
+    # Mock 模式直接返回成功
+    if conn.mock_enabled == "1":
+        return ResponseBase(data={"reachable": True, "mock": True, "message": "Mock模式已启用，跳过连接测试"})
+
     test_url = conn.base_url.rstrip("/")
     if conn.health_check_path:
         test_url += "/" + conn.health_check_path.lstrip("/")
 
     try:
+        headers = {}
+        if conn.auth_type == "api_key" and conn.auth_config:
+            key_name = conn.auth_config.get("header_name", "Authorization")
+            key_value = conn.auth_config.get("key_value", "")
+            headers[key_name] = key_value
         with httpx.Client(timeout=conn.timeout) as client:
-            headers = {}
-            if conn.auth_type == "api_key" and conn.auth_config:
-                key_name = conn.auth_config.get("header_name", "Authorization")
-                key_value = conn.auth_config.get("key_value", "")
-                headers[key_name] = key_value
             resp = client.get(test_url, headers=headers)
             return ResponseBase(data={
                 "reachable": True,
@@ -97,3 +101,5 @@ def test_connector(connector_id: int, db: Session = Depends(get_db)):
         return ResponseBase(code=1, message="连接失败", data={"reachable": False, "error": "无法连接到目标地址"})
     except httpx.TimeoutException:
         return ResponseBase(code=1, message="连接超时", data={"reachable": False, "error": "连接超时"})
+    except Exception as e:
+        return ResponseBase(code=1, message="连接异常", data={"reachable": False, "error": str(e)})

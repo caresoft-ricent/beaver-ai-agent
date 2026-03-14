@@ -133,13 +133,14 @@ export default function ChatPage() {
 
   /* ─── Render ─── */
   return (
-    <Layout style={{ height: 'calc(100vh - 112px)', background: 'transparent' }}>
+    <Layout style={{ height: 'calc(100vh - 112px)', margin: '-24px', background: 'transparent', overflow: 'hidden' }}>
       {/* --- Session sidebar --- */}
       <Sider
         width={260}
         style={{
           background: themeToken.colorBgContainer,
           borderRight: `1px solid ${themeToken.colorBorderSecondary}`,
+          overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
         }}
@@ -195,9 +196,9 @@ export default function ChatPage() {
       </Sider>
 
       {/* --- Main chat area --- */}
-      <Content style={{ display: 'flex', flexDirection: 'column', background: themeToken.colorBgLayout }}>
+      <Content style={{ display: 'flex', flexDirection: 'column', background: themeToken.colorBgLayout, overflow: 'hidden' }}>
         {/* Messages */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '16px 24px' }}>
+        <div style={{ flex: 1, overflow: 'auto', padding: '16px 24px', minHeight: 0 }}>
           {messages.length === 0 ? (
             <div style={{ textAlign: 'center', marginTop: 80, color: themeToken.colorTextSecondary }}>
               <RobotOutlined style={{ fontSize: 48, marginBottom: 16 }} />

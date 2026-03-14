@@ -73,19 +73,46 @@ export const publishEntity = (id: number) =>
 
 // Skills (Intent)
 export const getSkills = (params?: { tenant_id?: number }) =>
-  client.get('/admin/intents/skills', { params });
+  client.get('/admin/intents', { params });
 
 export const createSkill = (data: Record<string, unknown>) =>
-  client.post('/admin/intents/skills', data);
+  client.post('/admin/intents', data);
 
 export const getSkill = (id: number) =>
-  client.get(`/admin/intents/skills/${id}`);
+  client.get(`/admin/intents/${id}`);
 
 export const updateSkill = (id: number, data: Record<string, unknown>) =>
-  client.put(`/admin/intents/skills/${id}`, data);
+  client.put(`/admin/intents/${id}`, data);
 
 export const deleteSkill = (id: number) =>
-  client.delete(`/admin/intents/skills/${id}`);
+  client.delete(`/admin/intents/${id}`);
 
 export const publishSkill = (id: number) =>
-  client.post(`/admin/intents/skills/${id}/publish`);
+  client.post(`/admin/intents/${id}/publish`);
+
+// Skill Tools
+export const getSkillTools = (skillId: number) =>
+  client.get(`/admin/intents/${skillId}`);
+
+export const createSkillTool = (skillId: number, data: Record<string, unknown>) =>
+  client.post(`/admin/intents/${skillId}/tools`, data);
+
+export const deleteSkillTool = (toolId: number) =>
+  client.delete(`/admin/intents/tools/${toolId}`);
+
+// Actions
+export const getActions = (entityId: number) =>
+  client.get(`/admin/ontologies/entities/${entityId}/actions`);
+
+export const createAction = (entityId: number, data: Record<string, unknown>) =>
+  client.post(`/admin/ontologies/entities/${entityId}/actions`, data);
+
+export const deleteAction = (actionId: number) =>
+  client.delete(`/admin/ontologies/actions/${actionId}`);
+
+// Entity Properties
+export const createEntityProperty = (entityId: number, data: Record<string, unknown>) =>
+  client.post(`/admin/ontologies/entities/${entityId}/properties`, data);
+
+export const deleteEntityProperty = (propertyId: number) =>
+  client.delete(`/admin/ontologies/properties/${propertyId}`);

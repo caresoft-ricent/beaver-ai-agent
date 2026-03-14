@@ -65,7 +65,7 @@ export default function AdminLayout() {
             退出
           </Button>
         </Header>
-        <Content style={{ margin: 16, padding: 24, background: colorBgContainer, borderRadius: borderRadiusLG, minHeight: 280 }}>
+        <Content style={{ margin: 16, padding: 24, background: colorBgContainer, borderRadius: borderRadiusLG, minHeight: 280, overflow: 'auto' }}>
           <Outlet />
         </Content>
       </Layout>

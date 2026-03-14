@@ -47,12 +47,12 @@
 | 页面 | 路由 | 功能 |
 |------|------|------|
 | 登录 | `/login` | 用户名密码登录，JWT 鉴权 |
-| 仪表盘 | `/` | 实时统计（租户数/连接器/大模型/技能数量） |
+| 仪表盘 | `/` | 实时统计（租户数/连接器/大模型/业务本体/已发布技能） |
 | 租户管理 | `/tenants` | 多租户 CRUD |
-| 连接器 | `/connectors` | 河狸云 API 连接配置，支持 Mock 模式 |
-| 大模型配置 | `/llm` | LLM 提供商/模型/API Key 管理 |
-| 业务本体 | `/ontology` | 实体定义（产线、人员等）、属性、操作 |
-| 技能/意图 | `/intents` | 意图规则配置（关键词、正则、回复模板） |
+| 连接器 | `/connectors` | 河狸云 API 连接配置，Mock 开关，认证配置，连接测试 |
+| 大模型配置 | `/llm` | LLM 提供商/模型/API Key 管理，测试验证 |
+| 业务本体 | `/ontology` | 实体定义 + 属性管理 + 操作管理，连接器关联，引导说明 |
+| 技能/意图 | `/intents` | 意图规则（关键词+正则+模板），工具链管理，引导说明 |
 | **对话测试** | `/chat` | **本次新增** — 完整聊天界面 |
 
 ### 3.2 对话引擎（核心）
@@ -223,7 +223,8 @@ beaver-ai-agent/
 │   │   │   └── engine.py       # ⭐ 对话引擎核心
 │   │   └── clients/
 │   │       ├── llm_client.py   # LLM 调用封装
-│   │       └── connector_client.py  # 连接器调用封装
+│   │       ├── connector_client.py  # 连接器调用封装
+│   │       └── beaver_cloud.py # 河狸云 API 专用客户端
 │   ├── scripts/
 │   │   └── seed_demo.py        # 演示数据脚本
 │   ├── alembic/                # 数据库迁移
@@ -250,12 +251,66 @@ beaver-ai-agent/
 
 ---
 
-## 六、后续可参与的工作
+## 六、最新更新（2026-03-14 第三轮）
+
+### 6.1 Bug 修复
+
+| 问题 | 修复方案 |
+|------|---------|
+| Chat 页面消息多时页面撑长 | 添加 `overflow:hidden` + 负边距补偿 AdminLayout padding |
+| Dashboard 缺少业务本体统计 | 新增第5个统计卡片（业务本体数量） |
+| 技能统计不准确 | 改为只统计已发布技能 (`status=published`) |
+| 前端技能 API 路径错误 | 修正为 `/admin/intents/` (去掉 `/skills` 前缀) |
+
+### 6.2 页面增强
+
+**连接器管理页**：
+- Mock 模式开关（Switch 切换）
+- 认证配置（Header名 + Token/Key）
+- 健康检查路径配置
+- 连接测试结果反馈优化
+
+**技能/意图管理页**：
+- 使用引导说明（可展开/收起）
+- 表格新增关键词列（Tag 可视化）、优先级列
+- 展开行显示详细信息（描述、正则、回答模板）
+- 工具链管理弹窗（添加/删除本体操作关联）
+- 表单优化：分区布局、字段提示、正则编辑器
+
+**业务本体管理页**：
+- 使用引导说明（可展开/收起）
+- 表格新增连接器列、调用方式图标标签
+- 属性/操作管理弹窗（内联 CRUD）
+- 属性表单：字段名、类型、输入/输出开关
+- 操作表单：编码、名称、HTTP方法、API路径
+- 表单优化：连接器下拉选择、描述提示
+
+### 6.3 API 修复与新增
+
+**修复**：
+- 技能相关 API 路径从 `/admin/intents/skills/` 改为 `/admin/intents/`
+- Dashboard 统计新增 `entities` 字段
+- 连接器测试端点增加 Mock 模式跳过 + 异常兜底
+
+**新增前端 API 函数**：
+- `getSkillTools` / `createSkillTool` / `deleteSkillTool`
+- `getActions` / `createAction` / `deleteAction`
+- `createEntityProperty` / `deleteEntityProperty`
+
+### 6.4 河狸云对接准备
+
+- 创建河狸云专用 API 客户端 (`beaver_cloud.py`)
+- 编写完整的 **《河狸云 API 对接指南》** (`docs/河狸云API对接指南.md`)
+- 包含：需要准备的 API 信息、5 步对接流程、技术架构图、SQL 示例、联调命令
+
+---
+
+## 七、后续可参与的工作
 
 | 优先级 | 任务 | 说明 |
 |--------|------|------|
+| **P0** | **对接河狸云真实 API** | 📋 详见 `docs/河狸云API对接指南.md`，需要河狸云团队提供 API Key |
 | P0 | 接入真实 LLM | 配置 LLM API Key 后，意图识别和回复生成将由大模型处理 |
-| P0 | 对接河狸云真实 API | 将连接器的 Mock 模式切换为真实 API 调用 |
 | P1 | 多轮对话上下文 | 当前每轮独立，需实现上下文记忆/槽位填充 |
 | P1 | 投诉/反馈技能 | 新增投诉提交、返修申请等写操作技能 |
 | P2 | 客户侧独立页面 | 当前 Chat 在管理后台内，可抽出为独立 H5/小程序 |
@@ -320,5 +375,5 @@ curl 'http://localhost:8000/api/v1/chat/sessions/{session_id}/history'
 
 # 仪表盘统计
 curl http://localhost:8000/api/admin/stats
-# ✅ 返回 {"tenants":1,"connectors":1,"llm_configs":0,"skills":3}
+# ✅ 返回 {"tenants":1,"connectors":1,"llm_configs":0,"entities":2,"skills":3}
 ```
