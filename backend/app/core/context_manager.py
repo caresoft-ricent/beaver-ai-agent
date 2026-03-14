@@ -2,12 +2,13 @@
 
 功能:
 1. 会话上下文存取（entities / 历史意图 / 已填槽位）
-2. 参数归一化（日期、枚举）
+2. 参数归一化（日期、枚举） — 优先从 DB 加载规则
 3. 参数转换（名称→ID）
 4. 槽位校验 + 追问提示生成
 """
 import re
 import json
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -16,6 +17,8 @@ from app.models.chat import ChatSession
 from app.models.intent import Skill, SkillTool
 from app.models.ontology import EntityProperty
 from app.models.action import ActionParameter
+
+logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────── 1. 上下文存取 ───────────────────────────
@@ -111,15 +114,20 @@ _STATUS_MAP: dict[str, dict[str, str]] = {
 }
 
 
-def normalize_date(text: str) -> Optional[dict]:
+def normalize_date(text: str, db: Session = None) -> Optional[dict]:
     """
     将中文日期表达归一化为 date_start / date_end 区间。
+    优先从 DB 加载规则，无 DB 或无规则时使用内置默认。
     返回 {"date_start": "YYYY-MM-DD", "date_end": "YYYY-MM-DD"} 或 None。
     """
-    phrases = _build_date_phrases()
+    # 尝试从 DB 加载日期规则
+    db_phrases = _load_db_date_phrases(db) if db else []
+    phrases = db_phrases if db_phrases else _build_date_phrases()
+
     for pattern, fn in phrases:
         if re.search(pattern, text):
             start, end = fn()
+            return {"date_start": str(start), "date_end": str(end)}
             return {"date_start": str(start), "date_end": str(end)}
 
     # 尝试绝对日期
@@ -137,20 +145,24 @@ def normalize_date(text: str) -> Optional[dict]:
     return None
 
 
-def normalize_status(value: str, domain: str = "") -> str:
-    """将中文状态映射为标准枚举值。domain 如 'order_status'。"""
-    if domain and domain in _STATUS_MAP:
-        mapped = _STATUS_MAP[domain].get(value)
+def normalize_status(value: str, domain: str = "", db: Session = None) -> str:
+    """将中文状态映射为标准枚举值。优先从 DB 加载，无规则时用内置映射。"""
+    # 尝试 DB 映射
+    db_map = _load_db_status_map(db) if db else {}
+    mapping = db_map if db_map else _STATUS_MAP
+
+    if domain and domain in mapping:
+        mapped = mapping[domain].get(value)
         if mapped:
             return mapped
     # 尝试所有 domain
-    for _d, mapping in _STATUS_MAP.items():
-        if value in mapping:
-            return mapping[value]
+    for _d, m in mapping.items():
+        if value in m:
+            return m[value]
     return value
 
 
-def normalize_entities(entities: dict, message: str) -> dict:
+def normalize_entities(entities: dict, message: str, db: Session = None) -> dict:
     """对抽取的实体做归一化：日期短语→区间，中文状态→标准值"""
     result = dict(entities)
 
@@ -158,16 +170,96 @@ def normalize_entities(entities: dict, message: str) -> dict:
     if "date" in result or "日期" in message or any(
         re.search(p, message) for p, _ in _build_date_phrases()
     ):
-        date_info = normalize_date(message)
+        date_info = normalize_date(message, db=db)
         if date_info:
             result.update(date_info)
 
     # 状态归一化
     for key in list(result.keys()):
         if "status" in key or "状态" in key:
-            result[key] = normalize_status(str(result[key]))
+            result[key] = normalize_status(str(result[key]), db=db)
 
     return result
+
+
+# ─────────── DB 规则加载 ───────────
+
+def _load_db_date_phrases(db: Session) -> list[tuple[str, callable]]:
+    """从 ai_normalization_rule 表加载日期短语规则"""
+    try:
+        from app.models.normalization import NormalizationRule
+        rows = (
+            db.query(NormalizationRule)
+            .filter(NormalizationRule.category == "date_phrase", NormalizationRule.is_active == True)
+            .order_by(NormalizationRule.sort_order)
+            .all()
+        )
+        if not rows:
+            return []
+        result = []
+        for r in rows:
+            pattern = r.pattern
+            code = r.rule_code
+            result.append((pattern, _make_date_fn(code)))
+        return result
+    except Exception as e:
+        logger.debug("加载DB日期规则失败, 使用内置默认: %s", e)
+        return []
+
+
+def _make_date_fn(code: str):
+    """根据 rule_code 生成日期计算 lambda"""
+    mapping = {
+        "today": lambda: (_today(), _today()),
+        "yesterday": lambda: (_today() - timedelta(days=1), _today() - timedelta(days=1)),
+        "day_before": lambda: (_today() - timedelta(days=2), _today() - timedelta(days=2)),
+        "tomorrow": lambda: (_today() + timedelta(days=1), _today() + timedelta(days=1)),
+        "this_week": lambda: (_today() - timedelta(days=_today().weekday()), _today()),
+        "last_week": lambda: (
+            _today() - timedelta(days=_today().weekday() + 7),
+            _today() - timedelta(days=_today().weekday() + 1),
+        ),
+        "this_month": lambda: (_today().replace(day=1), _today()),
+        "last_month": lambda: (
+            (_today().replace(day=1) - timedelta(days=1)).replace(day=1),
+            _today().replace(day=1) - timedelta(days=1),
+        ),
+        "recent_1w": lambda: (_today() - timedelta(weeks=1), _today()),
+        "recent_2w": lambda: (_today() - timedelta(weeks=2), _today()),
+        "recent_1m": lambda: (_today() - timedelta(days=30), _today()),
+        "recent_2m": lambda: (_today() - timedelta(days=60), _today()),
+        "recent_3m": lambda: (_today() - timedelta(days=90), _today()),
+        "recent_6m": lambda: (_today() - timedelta(days=180), _today()),
+        "recent_1y": lambda: (_today() - timedelta(days=365), _today()),
+        "this_year": lambda: (_today().replace(month=1, day=1), _today()),
+        "last_year": lambda: (
+            _today().replace(year=_today().year - 1, month=1, day=1),
+            _today().replace(year=_today().year - 1, month=12, day=31),
+        ),
+    }
+    return mapping.get(code, lambda: (_today(), _today()))
+
+
+def _load_db_status_map(db: Session) -> dict[str, dict[str, str]]:
+    """从 ai_normalization_rule 表加载状态映射"""
+    try:
+        from app.models.normalization import NormalizationRule
+        rows = (
+            db.query(NormalizationRule)
+            .filter(NormalizationRule.category == "status_mapping", NormalizationRule.is_active == True)
+            .order_by(NormalizationRule.sort_order)
+            .all()
+        )
+        if not rows:
+            return {}
+        result: dict[str, dict[str, str]] = {}
+        for r in rows:
+            if r.domain and r.source_value and r.target_value:
+                result.setdefault(r.domain, {})[r.source_value] = r.target_value
+        return result
+    except Exception as e:
+        logger.debug("加载DB状态映射失败, 使用内置默认: %s", e)
+        return {}
 
 
 # ─────────────────────────── 3. 参数转换 ───────────────────────────

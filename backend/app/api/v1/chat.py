@@ -75,6 +75,7 @@ def chat_completions(req: ChatRequest, db: Session = Depends(get_db)):
         session_id=session.session_id,
         reply=result.reply,
         reply_type=result.get("reply_type", "text"),
+        intent=result.get("intent"),
         structured_data=result.get("structured_data"),
         evidence_chain=result.get("evidence_chain"),
         suggested_actions=result.get("suggested_actions"),
@@ -124,9 +125,10 @@ async def chat_stream(req: AGUIStreamRequest, request: Request, db: Session = De
     collected_text: list[str] = []
     collected_intent: str | None = None
     collected_data: dict | None = None
+    collected_evidence: dict | None = None
 
     async def event_generator():
-        nonlocal collected_intent, collected_data
+        nonlocal collected_intent, collected_data, collected_evidence
         async for event_str in stream_dialog(
             db=db,
             tenant_id=tenant_id,
@@ -144,18 +146,17 @@ async def chat_stream(req: AGUIStreamRequest, request: Request, db: Session = De
                     collected_text.append(payload.get("delta", ""))
                 except Exception:
                     pass
-            elif '"intent"' in event_str and '"CUSTOM"' in event_str:
+            elif '"CUSTOM"' in event_str:
                 import json as _json
                 try:
                     payload = _json.loads(event_str.split("data: ", 1)[1].strip())
-                    collected_intent = payload.get("value", {}).get("code")
-                except Exception:
-                    pass
-            elif '"structured_data"' in event_str and '"CUSTOM"' in event_str:
-                import json as _json
-                try:
-                    payload = _json.loads(event_str.split("data: ", 1)[1].strip())
-                    collected_data = payload.get("value")
+                    evt_name = payload.get("name", "")
+                    if evt_name == "intent":
+                        collected_intent = payload.get("value", {}).get("code")
+                    elif evt_name == "structured_data":
+                        collected_data = payload.get("value")
+                    elif evt_name == "evidence":
+                        collected_evidence = payload.get("value")
                 except Exception:
                     pass
 
@@ -170,6 +171,7 @@ async def chat_stream(req: AGUIStreamRequest, request: Request, db: Session = De
                 content=full_reply,
                 intent=collected_intent,
                 structured_data=collected_data,
+                evidence_chain=collected_evidence,
             )
             db.add(ai_msg)
             session.message_count = (session.message_count or 0) + 2

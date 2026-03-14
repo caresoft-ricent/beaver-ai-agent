@@ -12,6 +12,7 @@ import SkillList from './pages/SkillList';
 import ChatPage from './pages/ChatPage';
 import ChatEmbed from './pages/ChatEmbed';
 import LogsPage from './pages/LogsPage';
+import NormalizationPage from './pages/NormalizationPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('token');
@@ -33,6 +34,7 @@ function App() {
             <Route path="llm" element={<LLMConfigList />} />
             <Route path="ontology" element={<EntityList />} />
             <Route path="intents" element={<SkillList />} />
+            <Route path="normalization" element={<NormalizationPage />} />
             <Route path="logs" element={<LogsPage />} />
             <Route path="chat" element={<ChatPage />} />
           </Route>

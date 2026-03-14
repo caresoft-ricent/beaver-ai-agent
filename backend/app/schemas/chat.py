@@ -1,5 +1,5 @@
 """对话相关Schema"""
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, Any
 from datetime import datetime
 
@@ -17,22 +17,27 @@ class AGUIMessage(BaseModel):
 
 
 class AGUIContext(BaseModel):
-    tenant_id: int = 1
-    customer_id: str = "C001"
+    tenant_id: int = Field(1, alias="tenant_id")
+    customer_id: str = Field("C001", alias="customer_id")
+
+    model_config = {"populate_by_name": True}
 
 
 class AGUIStreamRequest(BaseModel):
-    """AG-UI 协议流式请求"""
-    thread_id: Optional[str] = None
-    run_id: Optional[str] = None
+    """AG-UI 协议流式请求 — 同时支持 camelCase 和 snake_case"""
+    thread_id: Optional[str] = Field(None, alias="threadId")
+    run_id: Optional[str] = Field(None, alias="runId")
     messages: list[AGUIMessage] = []
     context: Optional[AGUIContext] = None
+
+    model_config = {"populate_by_name": True}
 
 
 class ChatResponse(BaseModel):
     session_id: str
     reply: str
     reply_type: str = "text"
+    intent: Optional[str] = None
     structured_data: Optional[dict] = None
     evidence_chain: Optional[dict] = None
     suggested_actions: Optional[list] = None

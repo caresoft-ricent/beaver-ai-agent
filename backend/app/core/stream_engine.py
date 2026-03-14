@@ -134,7 +134,14 @@ async def _stream_dialog_inner(
     })
     yield agui.step_finished("intent_recognition")
 
-    # 更新上下文: 记住当前意图
+    # 更新上下文: 意图切换检测 — 换话题时清除旧实体避免污染
+    prev_intent = ctx.get("last_intent")
+    if prev_intent and prev_intent != matched_skill.skill_code:
+        ctx["entities"] = {}
+        evidence.add_step("intent_switch", {
+            "from": prev_intent, "to": matched_skill.skill_code,
+            "cleared_entities": True,
+        })
     ctx["last_intent"] = matched_skill.skill_code
     history_intents = ctx.get("history_intents", [])
     history_intents.append(matched_skill.skill_code)
@@ -154,7 +161,7 @@ async def _stream_dialog_inner(
         evidence.add_step("llm_entity_extraction", {"extracted": llm_entities})
 
     # 参数归一化 (日期、枚举等)
-    entities = normalize_entities(entities, message)
+    entities = normalize_entities(entities, message, db=db)
     evidence.add_step("normalize_entities", {"normalized": entities})
 
     # 参数转换 (名称->ID等)

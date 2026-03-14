@@ -15,6 +15,9 @@ import {
   UserOutlined,
   KeyOutlined,
   FileSearchOutlined,
+  SettingOutlined,
+  ToolOutlined,
+  SwapOutlined,
 } from '@ant-design/icons';
 import { changePassword } from '../api/admin';
 
@@ -22,12 +25,34 @@ const { Header, Sider, Content } = Layout;
 
 const menuItems = [
   { key: '/', icon: <DashboardOutlined />, label: '仪表盘' },
-  { key: '/tenants', icon: <TeamOutlined />, label: '租户管理' },
-  { key: '/connectors', icon: <ApiOutlined />, label: '连接器' },
-  { key: '/llm', icon: <RobotOutlined />, label: '大模型配置' },
-  { key: '/ontology', icon: <ApartmentOutlined />, label: '业务本体' },
-  { key: '/intents', icon: <ThunderboltOutlined />, label: '技能/意图' },
-  { key: '/logs', icon: <FileSearchOutlined />, label: '日志查询' },
+  {
+    key: 'system',
+    icon: <SettingOutlined />,
+    label: '系统管理',
+    children: [
+      { key: '/tenants', icon: <TeamOutlined />, label: '租户管理' },
+      { key: '/connectors', icon: <ApiOutlined />, label: '连接器' },
+    ],
+  },
+  {
+    key: 'ai',
+    icon: <RobotOutlined />,
+    label: 'AI 配置',
+    children: [
+      { key: '/llm', icon: <RobotOutlined />, label: '大模型' },
+      { key: '/ontology', icon: <ApartmentOutlined />, label: '业务本体' },
+      { key: '/intents', icon: <ThunderboltOutlined />, label: '技能/意图' },
+      { key: '/normalization', icon: <SwapOutlined />, label: '归一化规则' },
+    ],
+  },
+  {
+    key: 'ops',
+    icon: <ToolOutlined />,
+    label: '运维',
+    children: [
+      { key: '/logs', icon: <FileSearchOutlined />, label: '日志查询' },
+    ],
+  },
   { type: 'divider' as const },
   { key: '/chat', icon: <CommentOutlined />, label: '对话测试' },
 ];
@@ -49,6 +74,18 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { token: { colorBgContainer, borderRadiusLG } } = theme.useToken();
+
+  // 根据当前路径自动展开所属分组
+  const getOpenKeys = () => {
+    const path = location.pathname;
+    for (const item of menuItems) {
+      if ('children' in item && item.children) {
+        if (item.children.some((c: any) => c.key === path)) return [item.key as string];
+      }
+    }
+    return [];
+  };
+  const [openKeys, setOpenKeys] = useState<string[]>(getOpenKeys);
 
   const user = (() => {
     try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; }
@@ -115,6 +152,8 @@ export default function AdminLayout() {
           theme="dark"
           mode="inline"
           selectedKeys={[location.pathname]}
+          openKeys={collapsed ? [] : openKeys}
+          onOpenChange={(keys) => setOpenKeys(keys)}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
         />

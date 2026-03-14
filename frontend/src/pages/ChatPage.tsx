@@ -8,11 +8,13 @@ import {
   RobotOutlined, DeleteOutlined, AudioOutlined, AudioMutedOutlined,
   LoadingOutlined, ToolOutlined, MenuOutlined,
 } from '@ant-design/icons';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import client from '../api/client';
 import { deleteSession } from '../api/admin';
 
 const { Sider, Content } = Layout;
-const { Text, Paragraph } = Typography;
+const { Text } = Typography;
 
 /* AG-UI Event */
 type AGUIEvent = {
@@ -465,66 +467,103 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
         <div style={{ flex: 1, overflow: 'auto', padding: isMobile ? '16px 0' : '24px 0', minHeight: 0 }}>
           <div style={{ maxWidth: 768, margin: '0 auto', padding: isMobile ? '0 12px' : '0 24px' }}>
             {messages.length === 0 ? (
-              <div style={{ textAlign: 'center', marginTop: isMobile ? 60 : 100, color: t.colorTextSecondary }}>
-                <img src="/logo.png" alt="logo" style={{ width: 56, marginBottom: 16, opacity: 0.7 }} />
-                <div style={{ fontSize: 20, fontWeight: 500, color: t.colorText }}>{'\u6cb3\u72f8\u4e91 AI \u52a9\u624b'}</div>
-                <div style={{ marginTop: 8, fontSize: 14 }}>{'\u53ef\u4ee5\u5e2e\u60a8\u67e5\u8be2\u4ea7\u7ebf\u8fdb\u5ea6\u3001\u73b0\u573a\u4eba\u5458\u4fe1\u606f\u7b49'}</div>
-                <Space style={{ marginTop: 24 }} wrap>
-                  {['\u67e5\u770b\u4ea7\u7ebf\u8fdb\u5ea6', '\u67e5\u8be2\u9a7b\u5382\u4eba\u5458', '\u4f60\u597d'].map((q) => (
-                    <Tag
-                      key={q}
+              <div style={{ textAlign: 'center', marginTop: isMobile ? 40 : 80, color: t.colorTextSecondary }}>
+                <div style={{
+                  width: 64, height: 64, borderRadius: 20, margin: '0 auto 16px',
+                  background: 'linear-gradient(135deg, #8B5CF6, #3B82F6)', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', fontSize: 32, color: '#fff',
+                }}>
+                  <RobotOutlined />
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 600, color: t.colorText }}>{'\u60a8\u597d\uff01\u6211\u662f\u6cb3\u72f8\u4e91AI\u52a9\u624b'}</div>
+                <div style={{ marginTop: 8, fontSize: 13, color: '#666', lineHeight: 1.6 }}>
+                  {'\u6211\u53ef\u4ee5\u5e2e\u60a8\u67e5\u8be2\u4ea7\u7ebf\u8fdb\u5ea6\u3001\u73b0\u573a\u4eba\u5458\u3001\u670d\u52a1\u8bb0\u5f55\u7b49\uff0c\u4e5f\u53ef\u4ee5\u5e2e\u60a8\u63d0\u4ea4\u6295\u8bc9\u6216\u53d1\u8d77\u8054\u7cfb\u3002'}
+                </div>
+                <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 320, margin: '24px auto 0' }}>
+                  {[
+                    { icon: '\ud83d\udcca', text: '\u67e5\u770b\u6211\u7684\u4ea7\u7ebf\u8fdb\u5ea6' },
+                    { icon: '\ud83d\udc65', text: '\u73b0\u573a\u6709\u51e0\u4e2a\u4eba\u5728\u65bd\u5de5' },
+                    { icon: '\ud83d\udcdd', text: '\u6211\u8981\u53cd\u9988\u4e00\u4e2a\u95ee\u9898' },
+                  ].map((q) => (
+                    <div
+                      key={q.text}
+                      onClick={() => handleQuickSend(q.text)}
                       style={{
-                        cursor: 'pointer', padding: '8px 16px', fontSize: 14,
-                        borderRadius: 20, border: `1px solid ${t.colorBorder}`,
-                        background: t.colorBgContainer,
+                        cursor: 'pointer', padding: '12px 16px', borderRadius: 12,
+                        border: '1px solid #E5E7EB', background: '#fff', fontSize: 13,
+                        color: '#666', display: 'flex', alignItems: 'center', gap: 10,
+                        transition: 'all 0.2s',
                       }}
-                      onClick={() => handleQuickSend(q)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = '#8B5CF6';
+                        e.currentTarget.style.color = '#8B5CF6';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = '#E5E7EB';
+                        e.currentTarget.style.color = '#666';
+                      }}
                     >
-                      {q}
-                    </Tag>
+                      <span style={{
+                        width: 32, height: 32, borderRadius: 8, background: '#F5F7FA',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                      }}>{q.icon}</span>
+                      <span>{q.text}</span>
+                    </div>
                   ))}
-                </Space>
+                </div>
               </div>
             ) : (
               messages.map((msg) => (
-                <div key={msg.id} style={{ marginBottom: isMobile ? 16 : 24 }}>
+                <div key={msg.id} style={{ marginBottom: isMobile ? 12 : 20 }}>
                   {msg.role === 'tool' ? (
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: 8,
-                      padding: '6px 12px', fontSize: 12, color: t.colorTextSecondary,
+                      padding: '4px 12px', fontSize: 12, color: t.colorTextSecondary,
                     }}>
-                      <ToolOutlined />
-                      <span>{msg.content}</span>
+                      <ToolOutlined style={{ fontSize: 11 }} />
+                      <span style={{ opacity: 0.8 }}>{msg.content}</span>
                     </div>
                   ) : (
                     <div style={{
-                      display: 'flex', gap: isMobile ? 10 : 16,
+                      display: 'flex', gap: isMobile ? 8 : 12,
                       flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
+                      alignItems: 'flex-start',
                     }}>
                       <div style={{
-                        width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                        width: 36, height: 36, borderRadius: 10, flexShrink: 0,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: msg.role === 'user' ? t.colorPrimary : '#f0f0f0',
-                        color: msg.role === 'user' ? '#fff' : '#666',
-                        fontSize: 14,
+                        background: msg.role === 'user' ? 'linear-gradient(135deg, #F5811F, #E06D0C)' : 'linear-gradient(135deg, #8B5CF6, #3B82F6)',
+                        color: '#fff', fontSize: 16,
                       }}>
                         {msg.role === 'user' ? <UserOutlined /> : <RobotOutlined />}
                       </div>
-                      <div style={{
-                        maxWidth: isMobile ? '85%' : '80%',
-                        background: msg.role === 'user' ? t.colorPrimary : t.colorBgContainer,
-                        color: msg.role === 'user' ? '#fff' : t.colorText,
-                        padding: isMobile ? '10px 14px' : '12px 16px', borderRadius: 16,
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-                        lineHeight: 1.6,
-                        fontSize: isMobile ? 14 : 15,
-                      }}>
-                        <Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap', color: 'inherit' }}>
-                          {msg.content}
-                          {msg.streaming && <span className="cursor-blink">{'\u258d'}</span>}
-                        </Paragraph>
+                      <div style={{ maxWidth: isMobile ? '82%' : '75%', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div style={{
+                          background: msg.role === 'user' ? 'linear-gradient(135deg, #F5811F, #E06D0C)' : '#fff',
+                          color: msg.role === 'user' ? '#fff' : t.colorText,
+                          padding: isMobile ? '10px 14px' : '12px 16px',
+                          borderRadius: 16,
+                          borderBottomRightRadius: msg.role === 'user' ? 4 : 16,
+                          borderBottomLeftRadius: msg.role === 'user' ? 16 : 4,
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                          lineHeight: 1.7, fontSize: isMobile ? 14 : 14,
+                        }}>
+                          {msg.role === 'user' ? (
+                            <span>{msg.content}</span>
+                          ) : (
+                            <div className="md-body">
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                              {msg.streaming && <span className="cursor-blink">{'\u258d'}</span>}
+                            </div>
+                          )}
+                        </div>
                         {msg.intent && (
-                          <Tag color="blue" style={{ marginTop: 8, fontSize: 11 }}>{msg.intent}</Tag>
+                          <Tag color="purple" style={{ alignSelf: 'flex-start', fontSize: 11, borderRadius: 10 }}>{msg.intent}</Tag>
+                        )}
+                        {msg.created_at && (
+                          <span style={{ fontSize: 11, color: t.colorTextQuaternary, paddingLeft: 4 }}>
+                            {msg.created_at.slice(11, 16)}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -546,14 +585,19 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
           </div>
         </div>
 
-        <div style={{ padding: isMobile ? '10px 12px 16px' : '16px 24px 24px', background: '#f7f7f8' }}>
+        <div style={{
+          padding: isMobile ? '8px 12px' : '12px 24px',
+          paddingBottom: isMobile ? 'calc(8px + env(safe-area-inset-bottom, 0px))' : 12,
+          background: '#fff',
+          borderTop: '1px solid #E5E7EB',
+        }}>
           <div style={{
             maxWidth: 768, margin: '0 auto',
-            background: t.colorBgContainer, borderRadius: 16,
-            border: `1px solid ${t.colorBorder}`,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+            background: '#F5F7FA', borderRadius: 24,
             display: 'flex', alignItems: 'flex-end',
-            padding: '8px 8px 8px 16px',
+            padding: '4px 4px 4px 16px',
+            border: '2px solid transparent',
+            transition: 'border-color 0.2s',
           }}>
             <Input.TextArea
               ref={inputRef}
@@ -563,7 +607,7 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
               placeholder={'\u7ed9 \u6cb3\u72f8\u4e91AI \u53d1\u6d88\u606f\u2026'}
               autoSize={{ minRows: 1, maxRows: 6 }}
               variant="borderless"
-              style={{ flex: 1, resize: 'none', fontSize: 15 }}
+              style={{ flex: 1, resize: 'none', fontSize: 14 }}
               disabled={sending}
             />
             <Space size={4}>
@@ -585,6 +629,7 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
                 onClick={handleSend}
                 loading={sending}
                 disabled={!hasInput}
+                style={{ background: hasInput ? 'linear-gradient(135deg, #8B5CF6, #3B82F6)' : undefined }}
               />
             </Space>
           </div>
@@ -600,6 +645,27 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
         @keyframes blink {
           50% { opacity: 0; }
         }
+        /* Markdown body styles */
+        .md-body { font-size: 14px; line-height: 1.7; }
+        .md-body p { margin: 0 0 8px; }
+        .md-body p:last-child { margin-bottom: 0; }
+        .md-body h1, .md-body h2, .md-body h3 { margin: 12px 0 8px; font-weight: 600; }
+        .md-body h3 { font-size: 15px; }
+        .md-body ul, .md-body ol { margin: 4px 0; padding-left: 20px; }
+        .md-body li { margin-bottom: 2px; }
+        .md-body strong { font-weight: 600; }
+        .md-body code {
+          background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px;
+          font-size: 13px; font-family: 'SF Mono', 'Menlo', monospace;
+        }
+        .md-body pre { background: #1E1B4B; color: #E2E8F0; padding: 12px; border-radius: 8px; overflow-x: auto; margin: 8px 0; }
+        .md-body pre code { background: none; color: inherit; padding: 0; }
+        .md-body table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 13px; }
+        .md-body th, .md-body td { border: 1px solid #E5E7EB; padding: 6px 10px; text-align: left; }
+        .md-body th { background: #F5F7FA; font-weight: 600; }
+        .md-body blockquote { border-left: 3px solid #8B5CF6; margin: 8px 0; padding: 4px 12px; color: #666; background: #F9FAFB; border-radius: 0 6px 6px 0; }
+        .md-body hr { border: none; border-top: 1px solid #E5E7EB; margin: 12px 0; }
+        .md-body a { color: #3B82F6; text-decoration: none; }
       `}</style>
     </Layout>
   );

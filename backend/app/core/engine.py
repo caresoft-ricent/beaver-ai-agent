@@ -1,6 +1,6 @@
-"""对话引擎 - 核心处理流程
+"""对话引擎 - 同步版核心处理流程
 
-用户输入 → 意图识别(规则+LLM) → 实体抽取 → 查询执行 → 回答生成
+用户输入 → 加载上下文 → 意图识别(规则+LLM) → 实体抽取+归一化 → 查询执行 → 回答生成
 """
 import re
 import json
@@ -13,6 +13,11 @@ from app.models.action import Action, ActionParameter
 from app.models.intent import Skill, SkillTool
 from app.clients.llm_client import call_llm, call_llm_for_intent
 from app.clients.connector_client import ConnectorClient
+from app.core.context_manager import (
+    load_context, save_context, merge_entities,
+    normalize_entities, convert_params, check_slots, build_clarification_reply,
+)
+from app.core.evidence import EvidenceCollector
 
 
 class EngineResult(dict):
@@ -38,8 +43,13 @@ class DialogEngine:
     def process(self, session_id: str, message: str) -> EngineResult:
         """主处理流程"""
         result = EngineResult(reply="", reply_type="text")
+        evidence = EvidenceCollector(session_id, self.tenant_id, self.customer_id)
 
-        # Step 1: 加载租户的技能配置
+        # Step 1: 加载上下文
+        ctx = load_context(self.db, session_id)
+        ctx["turn_count"] = ctx.get("turn_count", 0) + 1
+
+        # Step 2: 加载租户的技能配置
         skills = (
             self.db.query(Skill)
             .filter(Skill.tenant_id == self.tenant_id, Skill.status == "published")
@@ -51,8 +61,8 @@ class DialogEngine:
             result.reply = "系统正在配置中，暂时无法回答您的问题。请稍后再试。"
             return result
 
-        # Step 2: 意图识别 - 先用规则匹配，再用LLM
-        matched_skill, confidence, entities = self._recognize_intent(message, skills)
+        # Step 3: 意图识别 - 先用规则匹配，再用LLM
+        matched_skill, confidence, entities = self._recognize_intent(message, skills, ctx)
 
         if not matched_skill:
             result.reply = "抱歉，我暂时无法理解您的问题。您可以试试：查看产线进度、查询现场人员、提交投诉等。"
@@ -60,7 +70,20 @@ class DialogEngine:
 
         result["intent"] = matched_skill.skill_code
 
-        # Step 3: 加载技能关联的工具链
+        # 意图切换检测 — 清除旧实体
+        prev_intent = ctx.get("last_intent")
+        if prev_intent and prev_intent != matched_skill.skill_code:
+            ctx["entities"] = {}
+        ctx["last_intent"] = matched_skill.skill_code
+
+        # 合并上下文实体 + 规则抽取实体
+        entities = merge_entities(ctx.get("entities", {}), entities)
+        entities = normalize_entities(entities, message, db=self.db)
+        entities = convert_params(self.db, entities, matched_skill)
+        ctx["entities"] = entities
+        save_context(self.db, session_id, ctx)
+
+        # Step 4: 加载技能关联的工具链
         tools = (
             self.db.query(SkillTool)
             .filter(SkillTool.skill_id == matched_skill.id)
@@ -80,13 +103,22 @@ class DialogEngine:
             result.reply = matched_skill.response_template or "您好！请问有什么可以帮助您的？"
             return result
 
-        # Step 4: 按顺序执行工具链
+        # Step 4.5: 槽位校验
+        slot_result = check_slots(self.db, matched_skill, entities)
+        if not slot_result.complete:
+            clarification = build_clarification_reply(slot_result)
+            if clarification:
+                result.reply = clarification
+                result["needs_clarification"] = True
+                result["clarification"] = {"missing": slot_result.missing_required}
+                return result
+
+        # Step 5: 按顺序执行工具链
         query_results = {}
         for tool in tools:
-            if tool.entity_id:
-                tool_result = self._execute_tool(tool, entities)
-                if tool_result:
-                    query_results[f"tool_{tool.order_no}"] = tool_result
+            tool_result = self._execute_tool(tool, entities)
+            if tool_result:
+                query_results[f"tool_{tool.order_no}"] = tool_result
 
         # Step 5: 生成回答
         if matched_skill.response_template and query_results:
@@ -107,7 +139,7 @@ class DialogEngine:
 
         return result
 
-    def _recognize_intent(self, message: str, skills: list[Skill]):
+    def _recognize_intent(self, message: str, skills: list[Skill], ctx: dict = None):
         """意图识别 - 规则优先(多关键词得分排序)，LLM兜底"""
         # 策略1: 关键词/正则匹配 — 按命中关键词数排序
         candidates = []
@@ -154,6 +186,7 @@ class DialogEngine:
                     api_key=llm_config.api_key,
                     user_message=message,
                     available_intents=available_intents,
+                    context=ctx.get("entities") if ctx else None,
                 )
                 intent_code = llm_result.get("intent")
                 confidence = llm_result.get("confidence", 0)

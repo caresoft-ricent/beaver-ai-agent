@@ -123,3 +123,22 @@ export const createEntityProperty = (entityId: number, data: Record<string, unkn
 
 export const deleteEntityProperty = (propertyId: number) =>
   client.delete(`/admin/ontologies/properties/${propertyId}`);
+
+// Normalization Rules
+export const getNormalizationRules = (params?: { category?: string; domain?: string; tenant_id?: number; is_active?: boolean; page?: number; size?: number }) =>
+  client.get('/admin/normalization', { params });
+
+export const getNormalizationCategories = () =>
+  client.get('/admin/normalization/categories');
+
+export const createNormalizationRule = (data: Record<string, unknown>) =>
+  client.post('/admin/normalization', data);
+
+export const updateNormalizationRule = (id: number, data: Record<string, unknown>) =>
+  client.put(`/admin/normalization/${id}`, data);
+
+export const deleteNormalizationRule = (id: number) =>
+  client.delete(`/admin/normalization/${id}`);
+
+export const initNormalizationRules = (tenantId: number = 0) =>
+  client.post('/admin/normalization/initialize', null, { params: { tenant_id: tenantId } });

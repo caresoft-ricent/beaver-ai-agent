@@ -6,3 +6,4 @@ from app.models.action import Action, ActionParameter  # noqa
 from app.models.intent import Skill, SkillTool  # noqa
 from app.models.chat import ChatSession, ChatMessage, ActionLog  # noqa
 from app.models.admin import AdminUser, OperationLog  # noqa
+from app.models.normalization import NormalizationRule  # noqa
