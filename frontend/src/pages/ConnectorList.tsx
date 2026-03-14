@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Table, Button, Modal, Form, Input, Select, Switch, message, Space, Tag, Popconfirm } from 'antd';
-import { PlusOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, PlayCircleOutlined, SearchOutlined } from '@ant-design/icons';
 import { getConnectors, createConnector, updateConnector, deleteConnector, testConnector } from '../api/admin';
 
 interface Connector {
@@ -20,6 +20,13 @@ export default function ConnectorList() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form] = Form.useForm();
+  const [searchText, setSearchText] = useState('');
+
+  const filteredData = useMemo(() => {
+    if (!searchText) return data;
+    const s = searchText.toLowerCase();
+    return data.filter(r => r.name?.toLowerCase().includes(s) || r.type?.toLowerCase().includes(s) || r.base_url?.toLowerCase().includes(s));
+  }, [data, searchText]);
 
   const load = async () => {
     setLoading(true);
@@ -91,12 +98,16 @@ export default function ConnectorList() {
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <h2 style={{ margin: 0 }}>连接器管理</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingId(null); form.resetFields(); setModalOpen(true); }}>
-          新建连接器
-        </Button>
+        <Space>
+          <Input placeholder="搜索名称/类型/URL" prefix={<SearchOutlined />} allowClear style={{ width: 220 }}
+            value={searchText} onChange={e => setSearchText(e.target.value)} />
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingId(null); form.resetFields(); setModalOpen(true); }}>
+            新建连接器
+          </Button>
+        </Space>
       </div>
 
-      <Table dataSource={data} rowKey="id" loading={loading} columns={[
+      <Table dataSource={filteredData} rowKey="id" loading={loading} columns={[
         { title: '名称', dataIndex: 'name' },
         { title: '类型', dataIndex: 'type', render: (t: string) => <Tag color="blue">{t === 'beaver_cloud' ? '河狸云' : t}</Tag> },
         { title: 'Base URL', dataIndex: 'base_url', ellipsis: true },

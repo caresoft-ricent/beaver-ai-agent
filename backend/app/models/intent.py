@@ -18,6 +18,7 @@ class Skill(Base):
     tenant_id = Column(BigInteger, nullable=False, index=True, comment="租户ID")
     skill_name = Column(String(128), nullable=False, comment="技能名称")
     skill_code = Column(String(64), nullable=False, comment="技能编码: QUERY_PROGRESS等")
+    category = Column(String(64), default="", comment="分类标签: 用于归类管理")
     skill_description = Column(Text, comment="技能描述(给AI理解意图用)")
     # 意图匹配配置
     match_keywords = Column(JSON, comment="关键词匹配列表(JSON数组)")

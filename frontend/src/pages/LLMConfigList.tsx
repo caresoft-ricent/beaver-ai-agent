@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Table, Button, Modal, Form, Input, Select, message, Space, Tag, Popconfirm, Switch } from 'antd';
-import { PlusOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, PlayCircleOutlined, SearchOutlined } from '@ant-design/icons';
 import { getLLMConfigs, createLLMConfig, updateLLMConfig, deleteLLMConfig, testLLMConfig } from '../api/admin';
 
 interface LLMConfig {
@@ -21,6 +21,13 @@ export default function LLMConfigList() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form] = Form.useForm();
+  const [searchText, setSearchText] = useState('');
+
+  const filteredData = useMemo(() => {
+    if (!searchText) return data;
+    const s = searchText.toLowerCase();
+    return data.filter(r => r.name?.toLowerCase().includes(s) || r.provider?.toLowerCase().includes(s) || r.model_name?.toLowerCase().includes(s) || r.usage?.toLowerCase().includes(s));
+  }, [data, searchText]);
 
   const load = async () => {
     setLoading(true);
@@ -72,12 +79,16 @@ export default function LLMConfigList() {
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <h2 style={{ margin: 0 }}>大模型配置</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingId(null); form.resetFields(); setModalOpen(true); }}>
-          新建配置
-        </Button>
+        <Space>
+          <Input placeholder="搜索名称/厂商/模型" prefix={<SearchOutlined />} allowClear style={{ width: 220 }}
+            value={searchText} onChange={e => setSearchText(e.target.value)} />
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingId(null); form.resetFields(); setModalOpen(true); }}>
+            新建配置
+          </Button>
+        </Space>
       </div>
 
-      <Table dataSource={data} rowKey="id" loading={loading} columns={[
+      <Table dataSource={filteredData} rowKey="id" loading={loading} columns={[
         { title: '名称', dataIndex: 'name' },
         { title: '厂商', dataIndex: 'provider', render: (p: string) => <Tag color="blue">{p}</Tag> },
         { title: '模型', dataIndex: 'model_name' },

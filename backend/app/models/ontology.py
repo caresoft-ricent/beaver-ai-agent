@@ -38,6 +38,7 @@ class Entity(Base):
                          comment="调用方式: api/database/mock")
     entity_code = Column(String(64), nullable=False, comment="本体编码")
     entity_name = Column(String(128), nullable=False, comment="本体名称")
+    category = Column(String(64), default="", comment="分类标签: 用于归类管理")
     entity_description = Column(Text, comment="本体描述(给AI理解用)")
     connector_id = Column(BigInteger, comment="关联连接器ID")
     status = Column(String(16), nullable=False, default="draft", comment="draft/published")

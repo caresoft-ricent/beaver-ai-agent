@@ -8,6 +8,7 @@ class SkillCreate(BaseModel):
     tenant_id: int
     skill_name: str
     skill_code: str
+    category: Optional[str] = ""
     skill_description: Optional[str] = None
     match_keywords: Optional[list] = None
     match_patterns: Optional[list] = None
@@ -26,6 +27,7 @@ class SkillCreate(BaseModel):
 class SkillUpdate(BaseModel):
     skill_name: Optional[str] = None
     skill_code: Optional[str] = None
+    category: Optional[str] = None
     skill_description: Optional[str] = None
     match_keywords: Optional[list] = None
     match_patterns: Optional[list] = None
@@ -47,6 +49,7 @@ class SkillOut(BaseModel):
     tenant_id: int
     skill_name: str
     skill_code: str
+    category: Optional[str] = ""
     skill_description: Optional[str] = None
     match_keywords: Optional[list] = None
     match_patterns: Optional[list] = None

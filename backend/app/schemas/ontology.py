@@ -9,6 +9,7 @@ class EntityCreate(BaseModel):
     entity_mode: str = "api"
     entity_code: str
     entity_name: str
+    category: Optional[str] = ""
     entity_description: Optional[str] = None
     connector_id: Optional[int] = None
 
@@ -17,6 +18,7 @@ class EntityUpdate(BaseModel):
     entity_mode: Optional[str] = None
     entity_code: Optional[str] = None
     entity_name: Optional[str] = None
+    category: Optional[str] = None
     entity_description: Optional[str] = None
     connector_id: Optional[int] = None
     status: Optional[str] = None
@@ -28,6 +30,7 @@ class EntityOut(BaseModel):
     entity_mode: str
     entity_code: str
     entity_name: str
+    category: Optional[str] = ""
     entity_description: Optional[str]
     connector_id: Optional[int]
     status: str

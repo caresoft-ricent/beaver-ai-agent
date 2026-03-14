@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Table, Button, Modal, Form, Input, Switch, message, Space, Tag, Popconfirm } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { getTenants, createTenant, updateTenant, deleteTenant } from '../api/admin';
 
 interface Tenant {
@@ -18,6 +18,13 @@ export default function TenantList() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form] = Form.useForm();
+  const [searchText, setSearchText] = useState('');
+
+  const filteredData = useMemo(() => {
+    if (!searchText) return data;
+    const s = searchText.toLowerCase();
+    return data.filter(r => r.name?.toLowerCase().includes(s) || r.code?.toLowerCase().includes(s) || r.description?.toLowerCase().includes(s));
+  }, [data, searchText]);
 
   const load = async () => {
     setLoading(true);
@@ -64,12 +71,16 @@ export default function TenantList() {
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <h2 style={{ margin: 0 }}>租户管理</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingId(null); form.resetFields(); setModalOpen(true); }}>
-          新建租户
-        </Button>
+        <Space>
+          <Input placeholder="搜索名称/编码" prefix={<SearchOutlined />} allowClear style={{ width: 200 }}
+            value={searchText} onChange={e => setSearchText(e.target.value)} />
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingId(null); form.resetFields(); setModalOpen(true); }}>
+            新建租户
+          </Button>
+        </Space>
       </div>
 
-      <Table dataSource={data} rowKey="id" loading={loading} columns={[
+      <Table dataSource={filteredData} rowKey="id" loading={loading} columns={[
         { title: '名称', dataIndex: 'name' },
         { title: '编码', dataIndex: 'code' },
         { title: '描述', dataIndex: 'description' },

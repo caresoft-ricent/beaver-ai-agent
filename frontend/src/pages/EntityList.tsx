@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Table, Button, Modal, Form, Input, Select, message, Space, Tag, Popconfirm,
   Alert, Card, Descriptions, Collapse, InputNumber, Typography, Divider, Empty,
@@ -7,6 +7,7 @@ import {
 import {
   PlusOutlined, SendOutlined, DeleteOutlined, InfoCircleOutlined,
   ApiOutlined, DatabaseOutlined, ExperimentOutlined, SettingOutlined,
+  SearchOutlined,
 } from '@ant-design/icons';
 import {
   getEntities, getEntity, createEntity, updateEntity, deleteEntity, publishEntity,
@@ -22,6 +23,7 @@ interface Entity {
   entity_code: string;
   entity_name: string;
   entity_mode: string;
+  category?: string;
   entity_description?: string;
   connector_id?: number;
   status: string;
@@ -63,6 +65,8 @@ export default function EntityList() {
   const [form] = Form.useForm();
   const [guideVisible, setGuideVisible] = useState(true);
   const [connectors, setConnectors] = useState<ConnectorItem[]>([]);
+  const [searchText, setSearchText] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('');
 
   // Detail panel state
   const [detailOpen, setDetailOpen] = useState(false);
@@ -97,12 +101,31 @@ export default function EntityList() {
 
   useEffect(() => { load(); loadConnectors(); }, [load, loadConnectors]);
 
+  const categories = useMemo(() => {
+    const cats = new Set(data.map(d => d.category).filter(Boolean));
+    return Array.from(cats) as string[];
+  }, [data]);
+
+  const filteredData = useMemo(() => {
+    let list = data;
+    if (categoryFilter) list = list.filter(r => r.category === categoryFilter);
+    if (searchText) {
+      const s = searchText.toLowerCase();
+      list = list.filter(r => r.entity_code?.toLowerCase().includes(s) || r.entity_name?.toLowerCase().includes(s) || r.entity_description?.toLowerCase().includes(s));
+    }
+    return list;
+  }, [data, searchText, categoryFilter]);
+
   const handleSubmit = async () => {
     const values = await form.validateFields();
     if (editingId) {
+      const val = values.category;
+      values.category = Array.isArray(val) ? val[0] || '' : val || '';
       await updateEntity(editingId, values);
       message.success('更新成功');
     } else {
+      const val = values.category;
+      values.category = Array.isArray(val) ? val[0] || '' : val || '';
       await createEntity(values);
       message.success('创建成功');
     }
@@ -190,6 +213,9 @@ export default function EntityList() {
   const columns = [
     { title: '编码', dataIndex: 'entity_code', width: 160 },
     { title: '名称', dataIndex: 'entity_name', width: 120 },
+    { title: '分类', dataIndex: 'category', width: 100,
+      render: (c: string) => c ? <Tag>{c}</Tag> : <Text type="secondary">未分类</Text>,
+    },
     {
       title: '调用方式', dataIndex: 'entity_mode', width: 110,
       render: (m: string) => <Tag icon={modeIcon[m]} color={modeColor[m]}>{modeLabel[m] || m}</Tag>,
@@ -227,7 +253,7 @@ export default function EntityList() {
       render: (_: unknown, record: Entity) => (
         <Space>
           <Button size="small" icon={<SettingOutlined />} onClick={() => openDetail(record)}>属性/操作</Button>
-          <Button size="small" onClick={() => { setEditingId(record.id); form.setFieldsValue(record); setModalOpen(true); }}>编辑</Button>
+          <Button size="small" onClick={() => { setEditingId(record.id); form.setFieldsValue({ ...record, category: record.category ? [record.category] : [] }); setModalOpen(true); }}>编辑</Button>
           <Popconfirm title="确认删除? 将同时删除所有属性和操作" okText="确认" cancelText="取消" onConfirm={() => deleteEntity(record.id).then(load)}>
             <Button size="small" danger>删除</Button>
           </Popconfirm>
@@ -241,6 +267,10 @@ export default function EntityList() {
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <h2 style={{ margin: 0 }}>业务本体管理</h2>
         <Space>
+          <Input placeholder="搜索编码/名称" prefix={<SearchOutlined />} allowClear style={{ width: 180 }}
+            value={searchText} onChange={e => setSearchText(e.target.value)} />
+          <Select placeholder="分类筛选" allowClear style={{ width: 140 }} value={categoryFilter || undefined}
+            onChange={v => setCategoryFilter(v || '')} options={categories.map(c => ({ value: c, label: c }))} />
           <Button icon={<InfoCircleOutlined />} onClick={() => setGuideVisible(!guideVisible)}>
             {guideVisible ? '收起引导' : '使用说明'}
           </Button>
@@ -279,7 +309,7 @@ export default function EntityList() {
         />
       )}
 
-      <Table dataSource={data} rowKey="id" loading={loading} columns={columns}
+      <Table dataSource={filteredData} rowKey="id" loading={loading} columns={columns}
         expandable={{
           expandedRowRender: (record: Entity) => (
             <Descriptions size="small" column={2} bordered>
@@ -306,6 +336,10 @@ export default function EntityList() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <Form.Item name="category" label="分类" tooltip="用于归类管理，如：生产管理、人员管理、订单管理">
+              <Select allowClear placeholder="选择或输入分类" mode="tags" maxCount={1}
+                options={categories.map(c => ({ value: c, label: c }))} />
+            </Form.Item>
             <Form.Item name="entity_mode" label="调用方式" tooltip="API=调用外部接口, Mock=使用模拟数据">
               <Select options={[
                 { value: 'api', label: '🔗 API调用（连接器）' },

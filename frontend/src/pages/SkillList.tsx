@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Table, Button, Modal, Form, Input, Select, message, Space, Tag, Popconfirm,
   Alert, Card, Descriptions, Collapse, InputNumber, Typography, Divider, Empty,
@@ -6,7 +6,7 @@ import {
 } from 'antd';
 import {
   PlusOutlined, SendOutlined, ThunderboltOutlined, DeleteOutlined,
-  InfoCircleOutlined, LinkOutlined,
+  InfoCircleOutlined, LinkOutlined, SearchOutlined,
 } from '@ant-design/icons';
 import {
   getSkills, createSkill, updateSkill, deleteSkill, publishSkill,
@@ -21,6 +21,7 @@ interface Skill {
   tenant_id: number;
   skill_code: string;
   skill_name: string;
+  category?: string;
   skill_description?: string;
   match_keywords?: string[];
   match_patterns?: string[];
@@ -56,6 +57,8 @@ export default function SkillList() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form] = Form.useForm();
   const [guideVisible, setGuideVisible] = useState(true);
+  const [searchText, setSearchText] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('');
 
   // Tool chain state
   const [toolModalOpen, setToolModalOpen] = useState(false);
@@ -95,6 +98,22 @@ export default function SkillList() {
 
   useEffect(() => { load(); loadEntities(); loadLLMConfigs(); }, [load, loadEntities, loadLLMConfigs]);
 
+  const categories = useMemo(() => {
+    const cats = new Set(data.map(d => d.category).filter(Boolean));
+    return Array.from(cats) as string[];
+  }, [data]);
+
+  const filteredData = useMemo(() => {
+    let list = data;
+    if (categoryFilter) list = list.filter(r => r.category === categoryFilter);
+    if (searchText) {
+      const s = searchText.toLowerCase();
+      list = list.filter(r => r.skill_code?.toLowerCase().includes(s) || r.skill_name?.toLowerCase().includes(s)
+        || r.skill_description?.toLowerCase().includes(s) || r.match_keywords?.some(k => k.toLowerCase().includes(s)));
+    }
+    return list;
+  }, [data, searchText, categoryFilter]);
+
   const handleEntityChangeForTool = async (entityId: number) => {
     toolForm.setFieldValue('action_id', undefined);
     setActionOptions([]);
@@ -115,9 +134,13 @@ export default function SkillList() {
       values.match_patterns = values.match_patterns.split('\n').map((k: string) => k.trim()).filter(Boolean);
     }
     if (editingId) {
+      const val = values.category;
+      values.category = Array.isArray(val) ? val[0] || '' : val || '';
       await updateSkill(editingId, values);
       message.success('更新成功');
     } else {
+      const val = values.category;
+      values.category = Array.isArray(val) ? val[0] || '' : val || '';
       await createSkill(values);
       message.success('创建成功');
     }
@@ -172,6 +195,7 @@ export default function SkillList() {
     setEditingId(record.id);
     form.setFieldsValue({
       ...record,
+      category: record.category ? [record.category] : [],
       match_keywords: Array.isArray(record.match_keywords) ? record.match_keywords.join(', ') : '',
       match_patterns: Array.isArray(record.match_patterns) ? record.match_patterns.join('\n') : '',
     });
@@ -181,6 +205,9 @@ export default function SkillList() {
   const columns = [
     { title: '编码', dataIndex: 'skill_code', width: 180 },
     { title: '名称', dataIndex: 'skill_name', width: 140 },
+    { title: '分类', dataIndex: 'category', width: 100,
+      render: (c: string) => c ? <Tag>{c}</Tag> : <Text type="secondary">未分类</Text>,
+    },
     {
       title: '关键词', dataIndex: 'match_keywords', width: 200,
       render: (kws: string[]) => kws?.length ? (
@@ -231,6 +258,10 @@ export default function SkillList() {
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <h2 style={{ margin: 0 }}>技能/意图管理</h2>
         <Space>
+          <Input placeholder="搜索编码/名称/关键词" prefix={<SearchOutlined />} allowClear style={{ width: 200 }}
+            value={searchText} onChange={e => setSearchText(e.target.value)} />
+          <Select placeholder="分类筛选" allowClear style={{ width: 140 }} value={categoryFilter || undefined}
+            onChange={v => setCategoryFilter(v || '')} options={categories.map(c => ({ value: c, label: c }))} />
           <Button icon={<InfoCircleOutlined />} onClick={() => setGuideVisible(!guideVisible)}>
             {guideVisible ? '收起引导' : '使用说明'}
           </Button>
@@ -268,7 +299,7 @@ export default function SkillList() {
         />
       )}
 
-      <Table dataSource={data} rowKey="id" loading={loading} columns={columns}
+      <Table dataSource={filteredData} rowKey="id" loading={loading} columns={columns}
         expandable={{
           expandedRowRender: (record: Skill) => (
             <Descriptions size="small" column={2} bordered>
@@ -297,6 +328,14 @@ export default function SkillList() {
             <Form.Item name="skill_name" label="技能名称" rules={[{ required: true, message: '请输入技能名称' }]}>
               <Input placeholder="如 查询产线进度" />
             </Form.Item>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <Form.Item name="category" label="分类" tooltip="用于归类管理，如：生产类、质量类、设备类">
+              <Select allowClear placeholder="选择或输入分类" mode="tags" maxCount={1}
+                options={categories.map(c => ({ value: c, label: c }))} />
+            </Form.Item>
+            <div />
           </div>
 
           <Form.Item name="skill_description" label="描述" tooltip="帮助 AI 理解何时触发此技能">
