@@ -1,7 +1,8 @@
 """对话API - 客户侧使用"""
 import uuid
 import time
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -9,6 +10,8 @@ from app.models.chat import ChatSession, ChatMessage
 from app.schemas.chat import ChatRequest, ChatResponse, ActionRequest, ActionResponse
 from app.schemas.common import ResponseBase
 from app.core.engine import DialogEngine
+from app.core.stream_engine import stream_dialog
+from app.core import agui
 
 router = APIRouter()
 
@@ -79,6 +82,102 @@ def chat_completions(req: ChatRequest, db: Session = Depends(get_db)):
         clarification=result.get("clarification"),
         context=result.get("context"),
     ).model_dump())
+
+
+@router.post("/stream")
+async def chat_stream(req: ChatRequest, request: Request, db: Session = Depends(get_db)):
+    """AG-UI 流式对话端点 — Server-Sent Events"""
+    # 获取或创建会话
+    if req.session_id:
+        session = db.query(ChatSession).filter(ChatSession.session_id == req.session_id).first()
+    else:
+        session = None
+
+    if not session:
+        session = ChatSession(
+            session_id=req.session_id or f"sess_{uuid.uuid4().hex[:16]}",
+            tenant_id=req.tenant_id,
+            customer_id=req.customer_id,
+        )
+        db.add(session)
+        db.flush()
+
+    # 保存用户消息
+    user_msg = ChatMessage(
+        session_id=session.session_id,
+        role="user",
+        content=req.message,
+    )
+    db.add(user_msg)
+    db.flush()
+
+    thread_id = session.session_id
+    run_id = agui.new_id()
+
+    # 收集全部回复文本用于存库
+    collected_text: list[str] = []
+    collected_intent: str | None = None
+    collected_data: dict | None = None
+
+    async def event_generator():
+        nonlocal collected_intent, collected_data
+        async for event_str in stream_dialog(
+            db=db,
+            tenant_id=req.tenant_id,
+            customer_id=req.customer_id,
+            session_id=session.session_id,
+            message=req.message,
+            thread_id=thread_id,
+            run_id=run_id,
+        ):
+            # 拦截内容用于存库
+            if '"TEXT_MESSAGE_CONTENT"' in event_str:
+                import json as _json
+                try:
+                    payload = _json.loads(event_str.split("data: ", 1)[1].strip())
+                    collected_text.append(payload.get("delta", ""))
+                except Exception:
+                    pass
+            elif '"intent"' in event_str and '"CUSTOM"' in event_str:
+                import json as _json
+                try:
+                    payload = _json.loads(event_str.split("data: ", 1)[1].strip())
+                    collected_intent = payload.get("value", {}).get("code")
+                except Exception:
+                    pass
+            elif '"structured_data"' in event_str and '"CUSTOM"' in event_str:
+                import json as _json
+                try:
+                    payload = _json.loads(event_str.split("data: ", 1)[1].strip())
+                    collected_data = payload.get("value")
+                except Exception:
+                    pass
+
+            yield event_str
+
+        # 流结束后保存 AI 回复
+        full_reply = "".join(collected_text)
+        if full_reply:
+            ai_msg = ChatMessage(
+                session_id=session.session_id,
+                role="assistant",
+                content=full_reply,
+                intent=collected_intent,
+                structured_data=collected_data,
+            )
+            db.add(ai_msg)
+            session.message_count = (session.message_count or 0) + 2
+            db.commit()
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Session-Id": session.session_id,
+        },
+    )
 
 
 @router.post("/actions")

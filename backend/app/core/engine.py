@@ -161,8 +161,47 @@ class DialogEngine:
         return None, 0, {}
 
     def _execute_tool(self, tool: SkillTool, entities: dict) -> Optional[dict]:
-        """执行单个工具"""
-        entity = self.db.query(Entity).filter(Entity.id == tool.entity_id).first()
+        """执行单个工具 — 支持两种模式:
+        1. api_config模式: tool.config.api_config 直接定义接口调用(殷明方案)
+        2. entity+action模式: 通过本体和操作间接调用(原方案)
+        """
+        # ── 模式1: 接口调用直接包装(api_config) ──
+        api_config = tool.config.get("api_config") if tool.config else None
+        if api_config and tool.tools_mode == "api":
+            params = {**entities, "customer_id": self.customer_id}
+            connector_id = api_config.get("connector_id")
+            connector = (
+                self.db.query(Connector).filter(Connector.id == connector_id).first()
+                if connector_id else None
+            )
+            if not connector:
+                mock = api_config.get("mock_response")
+                return {"data": mock, "source": "mock"} if mock else None
+
+            client = ConnectorClient({
+                "base_url": connector.base_url,
+                "auth_type": connector.auth_type,
+                "auth_config": connector.auth_config,
+                "timeout": connector.timeout,
+                "mock_enabled": connector.mock_enabled,
+            })
+            try:
+                return client.call_action(
+                    action_config={
+                        "http_method": api_config.get("http_method", "GET"),
+                        "api_path": api_config.get("api_path", ""),
+                        "request_template": api_config.get("request_template"),
+                        "response_mapping": api_config.get("response_mapping"),
+                    },
+                    params=params,
+                    mock_response=api_config.get("mock_response"),
+                )
+            except Exception:
+                mock = api_config.get("mock_response")
+                return {"data": mock, "source": "mock_fallback"} if mock else None
+
+        # ── 模式2: 本体+操作(entity+action) ──
+        entity = self.db.query(Entity).filter(Entity.id == tool.entity_id).first() if tool.entity_id else None
         if not entity:
             return None
 
