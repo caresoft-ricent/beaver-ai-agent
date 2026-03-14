@@ -11,6 +11,24 @@ class ChatRequest(BaseModel):
     message: str
 
 
+class AGUIMessage(BaseModel):
+    role: str
+    content: str
+
+
+class AGUIContext(BaseModel):
+    tenant_id: int = 1
+    customer_id: str = "C001"
+
+
+class AGUIStreamRequest(BaseModel):
+    """AG-UI 协议流式请求"""
+    thread_id: Optional[str] = None
+    run_id: Optional[str] = None
+    messages: list[AGUIMessage] = []
+    context: Optional[AGUIContext] = None
+
+
 class ChatResponse(BaseModel):
     session_id: str
     reply: str

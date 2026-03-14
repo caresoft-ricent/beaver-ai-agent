@@ -101,10 +101,13 @@ export default function AdminLayout() {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Sider trigger={null} collapsible collapsed={collapsed} theme="dark">
-        <div style={{ height: 48, margin: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ color: '#fff', fontSize: collapsed ? 14 : 18, fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-            {collapsed ? 'AI' : '河狸云 AI 管理'}
-          </span>
+        <div style={{ height: 48, margin: 16, display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start', gap: 10 }}>
+          <img src="/logo.png" alt="logo" style={{ width: 32, height: 32, borderRadius: 6, flexShrink: 0 }} />
+          {!collapsed && (
+            <span style={{ color: '#fff', fontSize: 16, fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+              河狸云 AI 管理
+            </span>
+          )}
         </div>
         <Menu
           theme="dark"

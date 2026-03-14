@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.chat import ChatSession, ChatMessage
-from app.schemas.chat import ChatRequest, ChatResponse, ActionRequest, ActionResponse
+from app.schemas.chat import ChatRequest, ChatResponse, ActionRequest, ActionResponse, AGUIStreamRequest
 from app.schemas.common import ResponseBase
 from app.core.engine import DialogEngine
 from app.core.stream_engine import stream_dialog
@@ -85,19 +85,25 @@ def chat_completions(req: ChatRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/stream")
-async def chat_stream(req: ChatRequest, request: Request, db: Session = Depends(get_db)):
+async def chat_stream(req: AGUIStreamRequest, request: Request, db: Session = Depends(get_db)):
     """AG-UI 流式对话端点 — Server-Sent Events"""
+    # 从 AG-UI 协议提取参数
+    message = req.messages[-1].content if req.messages else ""
+    tenant_id = req.context.tenant_id if req.context else 1
+    customer_id = req.context.customer_id if req.context else "C001"
+    session_id = req.thread_id
+
     # 获取或创建会话
-    if req.session_id:
-        session = db.query(ChatSession).filter(ChatSession.session_id == req.session_id).first()
+    if session_id:
+        session = db.query(ChatSession).filter(ChatSession.session_id == session_id).first()
     else:
         session = None
 
     if not session:
         session = ChatSession(
-            session_id=req.session_id or f"sess_{uuid.uuid4().hex[:16]}",
-            tenant_id=req.tenant_id,
-            customer_id=req.customer_id,
+            session_id=session_id or f"sess_{uuid.uuid4().hex[:16]}",
+            tenant_id=tenant_id,
+            customer_id=customer_id,
         )
         db.add(session)
         db.flush()
@@ -106,13 +112,13 @@ async def chat_stream(req: ChatRequest, request: Request, db: Session = Depends(
     user_msg = ChatMessage(
         session_id=session.session_id,
         role="user",
-        content=req.message,
+        content=message,
     )
     db.add(user_msg)
     db.flush()
 
     thread_id = session.session_id
-    run_id = agui.new_id()
+    run_id = req.run_id or agui.new_id()
 
     # 收集全部回复文本用于存库
     collected_text: list[str] = []
@@ -123,10 +129,10 @@ async def chat_stream(req: ChatRequest, request: Request, db: Session = Depends(
         nonlocal collected_intent, collected_data
         async for event_str in stream_dialog(
             db=db,
-            tenant_id=req.tenant_id,
-            customer_id=req.customer_id,
+            tenant_id=tenant_id,
+            customer_id=customer_id,
             session_id=session.session_id,
-            message=req.message,
+            message=message,
             thread_id=thread_id,
             run_id=run_id,
         ):

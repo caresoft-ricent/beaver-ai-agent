@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Layout, Input, Button, List, Typography, Space, Spin, Tag, Empty,
-  theme, Popconfirm, message, Tooltip,
+  theme, Popconfirm, message, Tooltip, Drawer,
 } from 'antd';
 import {
   SendOutlined, PlusOutlined, MessageOutlined, UserOutlined,
   RobotOutlined, DeleteOutlined, AudioOutlined, AudioMutedOutlined,
-  LoadingOutlined, ToolOutlined,
+  LoadingOutlined, ToolOutlined, MenuOutlined,
 } from '@ant-design/icons';
 import client from '../api/client';
 import { deleteSession } from '../api/admin';
@@ -67,8 +67,19 @@ interface SpeechRecognitionAlternative {
   transcript: string;
 }
 
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+};
+
 export default function ChatPage() {
   const { token: t } = theme.useToken();
+  const isMobile = useIsMobile();
 
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSession, setActiveSession] = useState<string | null>(null);
@@ -78,6 +89,7 @@ export default function ChatPage() {
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [listening, setListening] = useState(false);
   const [currentStep, setCurrentStep] = useState<string | null>(null);
+  const [siderOpen, setSiderOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<any>(null);
@@ -155,6 +167,7 @@ export default function ChatPage() {
     setMessages([]);
     setInputValue('');
     setCurrentStep(null);
+    setSiderOpen(false);
     inputRef.current?.focus();
   };
 
@@ -222,8 +235,7 @@ export default function ChatPage() {
     }
   };
 
-  const handleSend = async () => {
-    const text = inputValue.replace(/\[.*?\]$/, '').trim();
+  const doSend = async (text: string) => {
     if (!text || sending) return;
     if (listening && recognitionRef.current) {
       recognitionRef.current.stop();
@@ -247,10 +259,12 @@ export default function ChatPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tenant_id: TENANT_ID,
-          customer_id: CUSTOMER_ID,
-          session_id: activeSession || undefined,
-          message: text,
+          thread_id: activeSession || undefined,
+          messages: [{ role: 'user', content: text }],
+          context: {
+            tenant_id: TENANT_ID,
+            customer_id: CUSTOMER_ID,
+          },
         }),
         signal: controller.signal,
       });
@@ -305,6 +319,15 @@ export default function ChatPage() {
     inputRef.current?.focus();
   };
 
+  const handleSend = async () => {
+    const text = inputValue.replace(/\[.*?\]$/, '').trim();
+    doSend(text);
+  };
+
+  const handleQuickSend = (q: string) => {
+    doSend(q);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -318,80 +341,123 @@ export default function ChatPage() {
     reply_generation: '\u751f\u6210\u56de\u7b54',
   };
 
+  const hasInput = inputValue.trim().length > 0;
+
+  /* ── Session list content (shared between desktop sider and mobile drawer) ── */
+  const sessionList = (
+    <>
+      <div style={{ padding: 12 }}>
+        <Button type="primary" icon={<PlusOutlined />} block onClick={handleNewChat}>
+          {'\u65b0\u5efa\u5bf9\u8bdd'}
+        </Button>
+      </div>
+      <div style={{ flex: 1, overflow: 'auto', padding: '0 4px' }}>
+        {loadingSessions ? (
+          <Spin style={{ display: 'block', marginTop: 40, textAlign: 'center' }} />
+        ) : (
+          <List
+            dataSource={sessions}
+            locale={{ emptyText: <Empty description={'\u6682\u65e0\u4f1a\u8bdd'} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
+            renderItem={(s) => (
+              <List.Item
+                onClick={() => { setActiveSession(s.session_id); setSiderOpen(false); }}
+                style={{
+                  cursor: 'pointer', padding: '8px 12px', borderRadius: 6,
+                  marginBottom: 2,
+                  background: s.session_id === activeSession ? t.colorPrimaryBg : 'transparent',
+                }}
+              >
+                <Space direction="vertical" size={0} style={{ width: '100%' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Space>
+                      <MessageOutlined />
+                      <Text ellipsis style={{ maxWidth: 140 }}>{s.customer_name || s.customer_id}</Text>
+                    </Space>
+                    <Popconfirm
+                      title={'\u786e\u5b9a\u5220\u9664\u8be5\u4f1a\u8bdd\uff1f'}
+                      description={'\u5220\u9664\u540e\u4e0d\u53ef\u6062\u590d'}
+                      onConfirm={(e) => handleDeleteSession(s.session_id, e as unknown as React.MouseEvent)}
+                      onCancel={(e) => e?.stopPropagation()}
+                      okText={'\u5220\u9664'}
+                      cancelText={'\u53d6\u6d88'}
+                    >
+                      <DeleteOutlined
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ color: t.colorTextSecondary, fontSize: 13 }}
+                      />
+                    </Popconfirm>
+                  </div>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {s.message_count} {'\u6761\u6d88\u606f'}
+                    {s.created_at && ` \u00b7 ${s.created_at.slice(5, 16).replace('T', ' ')}`}
+                  </Text>
+                </Space>
+              </List.Item>
+            )}
+          />
+        )}
+      </div>
+    </>
+  );
+
   return (
-    <Layout style={{ height: 'calc(100vh - 112px)', margin: '-24px', background: 'transparent', overflow: 'hidden' }}>
-      <Sider
-        width={260}
-        style={{
-          background: t.colorBgContainer,
-          borderRight: `1px solid ${t.colorBorderSecondary}`,
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        <div style={{ padding: 12 }}>
-          <Button type="primary" icon={<PlusOutlined />} block onClick={handleNewChat}>
-            {'\u65b0\u5efa\u5bf9\u8bdd'}
-          </Button>
-        </div>
-        <div style={{ flex: 1, overflow: 'auto', padding: '0 4px' }}>
-          {loadingSessions ? (
-            <Spin style={{ display: 'block', marginTop: 40, textAlign: 'center' }} />
-          ) : (
-            <List
-              dataSource={sessions}
-              locale={{ emptyText: <Empty description={'\u6682\u65e0\u4f1a\u8bdd'} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
-              renderItem={(s) => (
-                <List.Item
-                  onClick={() => setActiveSession(s.session_id)}
-                  style={{
-                    cursor: 'pointer', padding: '8px 12px', borderRadius: 6,
-                    marginBottom: 2,
-                    background: s.session_id === activeSession ? t.colorPrimaryBg : 'transparent',
-                  }}
-                >
-                  <Space direction="vertical" size={0} style={{ width: '100%' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Space>
-                        <MessageOutlined />
-                        <Text ellipsis style={{ maxWidth: 140 }}>{s.customer_name || s.customer_id}</Text>
-                      </Space>
-                      <Popconfirm
-                        title={'\u786e\u5b9a\u5220\u9664\u8be5\u4f1a\u8bdd\uff1f'}
-                        description={'\u5220\u9664\u540e\u4e0d\u53ef\u6062\u590d'}
-                        onConfirm={(e) => handleDeleteSession(s.session_id, e as unknown as React.MouseEvent)}
-                        onCancel={(e) => e?.stopPropagation()}
-                        okText={'\u5220\u9664'}
-                        cancelText={'\u53d6\u6d88'}
-                      >
-                        <DeleteOutlined
-                          onClick={(e) => e.stopPropagation()}
-                          style={{ color: t.colorTextSecondary, fontSize: 13 }}
-                        />
-                      </Popconfirm>
-                    </div>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      {s.message_count} {'\u6761\u6d88\u606f'}
-                      {s.created_at && ` \u00b7 ${s.created_at.slice(5, 16).replace('T', ' ')}`}
-                    </Text>
-                  </Space>
-                </List.Item>
-              )}
-            />
-          )}
-        </div>
-      </Sider>
+    <Layout style={{
+      height: isMobile ? '100vh' : 'calc(100vh - 112px)',
+      margin: isMobile ? 0 : '-24px',
+      background: 'transparent', overflow: 'hidden',
+    }}>
+      {/* Desktop sidebar */}
+      {!isMobile && (
+        <Sider
+          width={260}
+          style={{
+            background: t.colorBgContainer,
+            borderRight: `1px solid ${t.colorBorderSecondary}`,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {sessionList}
+        </Sider>
+      )}
+
+      {/* Mobile drawer */}
+      {isMobile && (
+        <Drawer
+          placement="left"
+          open={siderOpen}
+          onClose={() => setSiderOpen(false)}
+          width={280}
+          styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column' } }}
+          title={'\u5386\u53f2\u5bf9\u8bdd'}
+        >
+          {sessionList}
+        </Drawer>
+      )}
 
       <Content style={{ display: 'flex', flexDirection: 'column', background: '#f7f7f8', overflow: 'hidden' }}>
-        <div style={{ flex: 1, overflow: 'auto', padding: '24px 0', minHeight: 0 }}>
-          <div style={{ maxWidth: 768, margin: '0 auto', padding: '0 24px' }}>
+        {/* Mobile topbar */}
+        {isMobile && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '10px 16px', background: t.colorBgContainer,
+            borderBottom: `1px solid ${t.colorBorderSecondary}`,
+          }}>
+            <Button type="text" icon={<MenuOutlined />} onClick={() => setSiderOpen(true)} />
+            <Text strong>{'\u6cb3\u72f8\u4e91 AI'}</Text>
+            <Button type="text" icon={<PlusOutlined />} onClick={handleNewChat} />
+          </div>
+        )}
+
+        <div style={{ flex: 1, overflow: 'auto', padding: isMobile ? '16px 0' : '24px 0', minHeight: 0 }}>
+          <div style={{ maxWidth: 768, margin: '0 auto', padding: isMobile ? '0 12px' : '0 24px' }}>
             {messages.length === 0 ? (
-              <div style={{ textAlign: 'center', marginTop: 100, color: t.colorTextSecondary }}>
+              <div style={{ textAlign: 'center', marginTop: isMobile ? 60 : 100, color: t.colorTextSecondary }}>
                 <img src="/logo.png" alt="logo" style={{ width: 56, marginBottom: 16, opacity: 0.7 }} />
                 <div style={{ fontSize: 20, fontWeight: 500, color: t.colorText }}>{'\u6cb3\u72f8\u4e91 AI \u52a9\u624b'}</div>
                 <div style={{ marginTop: 8, fontSize: 14 }}>{'\u53ef\u4ee5\u5e2e\u60a8\u67e5\u8be2\u4ea7\u7ebf\u8fdb\u5ea6\u3001\u73b0\u573a\u4eba\u5458\u4fe1\u606f\u7b49'}</div>
-                <Space style={{ marginTop: 32 }} wrap>
+                <Space style={{ marginTop: 24 }} wrap>
                   {['\u67e5\u770b\u4ea7\u7ebf\u8fdb\u5ea6', '\u67e5\u8be2\u9a7b\u5382\u4eba\u5458', '\u4f60\u597d'].map((q) => (
                     <Tag
                       key={q}
@@ -400,7 +466,7 @@ export default function ChatPage() {
                         borderRadius: 20, border: `1px solid ${t.colorBorder}`,
                         background: t.colorBgContainer,
                       }}
-                      onClick={() => { setInputValue(q); inputRef.current?.focus(); }}
+                      onClick={() => handleQuickSend(q)}
                     >
                       {q}
                     </Tag>
@@ -409,7 +475,7 @@ export default function ChatPage() {
               </div>
             ) : (
               messages.map((msg) => (
-                <div key={msg.id} style={{ marginBottom: 24 }}>
+                <div key={msg.id} style={{ marginBottom: isMobile ? 16 : 24 }}>
                   {msg.role === 'tool' ? (
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: 8,
@@ -420,7 +486,7 @@ export default function ChatPage() {
                     </div>
                   ) : (
                     <div style={{
-                      display: 'flex', gap: 16,
+                      display: 'flex', gap: isMobile ? 10 : 16,
                       flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
                     }}>
                       <div style={{
@@ -433,12 +499,13 @@ export default function ChatPage() {
                         {msg.role === 'user' ? <UserOutlined /> : <RobotOutlined />}
                       </div>
                       <div style={{
-                        maxWidth: '80%',
+                        maxWidth: isMobile ? '85%' : '80%',
                         background: msg.role === 'user' ? t.colorPrimary : t.colorBgContainer,
                         color: msg.role === 'user' ? '#fff' : t.colorText,
-                        padding: '12px 16px', borderRadius: 16,
+                        padding: isMobile ? '10px 14px' : '12px 16px', borderRadius: 16,
                         boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                         lineHeight: 1.6,
+                        fontSize: isMobile ? 14 : 15,
                       }}>
                         <Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap', color: 'inherit' }}>
                           {msg.content}
@@ -467,7 +534,7 @@ export default function ChatPage() {
           </div>
         </div>
 
-        <div style={{ padding: '16px 24px 24px', background: '#f7f7f8' }}>
+        <div style={{ padding: isMobile ? '10px 12px 16px' : '16px 24px 24px', background: '#f7f7f8' }}>
           <div style={{
             maxWidth: 768, margin: '0 auto',
             background: t.colorBgContainer, borderRadius: 16,
@@ -488,30 +555,26 @@ export default function ChatPage() {
               disabled={sending}
             />
             <Space size={4}>
-              <Tooltip title={listening ? '\u505c\u6b62\u542c\u5199' : '\u8bed\u97f3\u8f93\u5165'}>
-                <Button
-                  type="text"
-                  shape="circle"
-                  icon={listening ? <AudioMutedOutlined style={{ color: '#f5222d' }} /> : <AudioOutlined />}
-                  onClick={toggleDictation}
-                  disabled={sending}
-                />
-              </Tooltip>
+              {!hasInput && (
+                <Tooltip title={listening ? '\u505c\u6b62\u542c\u5199' : '\u8bed\u97f3\u8f93\u5165'}>
+                  <Button
+                    type="text"
+                    shape="circle"
+                    icon={listening ? <AudioMutedOutlined style={{ color: '#f5222d' }} /> : <AudioOutlined />}
+                    onClick={toggleDictation}
+                    disabled={sending}
+                  />
+                </Tooltip>
+              )}
               <Button
                 type="primary"
                 shape="circle"
                 icon={<SendOutlined />}
                 onClick={handleSend}
                 loading={sending}
-                disabled={!inputValue.trim()}
+                disabled={!hasInput}
               />
             </Space>
-          </div>
-          <div style={{
-            maxWidth: 768, margin: '8px auto 0', textAlign: 'center',
-            fontSize: 12, color: t.colorTextQuaternary,
-          }}>
-            {'\u6cb3\u72f8\u4e91 AI \u53ef\u80fd\u4f1a\u72af\u9519\uff0c\u8bf7\u6838\u5b9e\u91cd\u8981\u4fe1\u606f'}
           </div>
         </div>
       </Content>
