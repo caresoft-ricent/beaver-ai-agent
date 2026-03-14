@@ -48,8 +48,14 @@ interface Session {
   created_at?: string;
 }
 
-const TENANT_ID = 1;
-const CUSTOMER_ID = 'C001';
+const TENANT_ID_DEFAULT = 1;
+const CUSTOMER_ID_DEFAULT = 'C001';
+
+interface ChatPageProps {
+  embedMode?: boolean;
+  tenantId?: number;
+  customerId?: string;
+}
 
 interface SpeechRecognitionEvent {
   results: SpeechRecognitionResultList;
@@ -77,9 +83,12 @@ const useIsMobile = () => {
   return isMobile;
 };
 
-export default function ChatPage() {
+export default function ChatPage({ embedMode, tenantId, customerId }: ChatPageProps = {}) {
   const { token: t } = theme.useToken();
   const isMobile = useIsMobile();
+
+  const TENANT_ID = tenantId ?? TENANT_ID_DEFAULT;
+  const CUSTOMER_ID = customerId ?? CUSTOMER_ID_DEFAULT;
 
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSession, setActiveSession] = useState<string | null>(null);
@@ -95,6 +104,7 @@ export default function ChatPage() {
   const inputRef = useRef<any>(null);
   const recognitionRef = useRef<any>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const skipHistoryRef = useRef(false);
 
   const loadSessions = useCallback(async () => {
     setLoadingSessions(true);
@@ -109,6 +119,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!activeSession) { setMessages([]); return; }
+    if (skipHistoryRef.current) { skipHistoryRef.current = false; return; }
     (async () => {
       try {
         const res = await client.get(`/v1/chat/sessions/${activeSession}/history`);
@@ -271,6 +282,7 @@ export default function ChatPage() {
 
       const headerSessionId = resp.headers.get('X-Session-Id');
       if (headerSessionId && !activeSession) {
+        skipHistoryRef.current = true;
         setActiveSession(headerSessionId);
       }
 
@@ -402,8 +414,8 @@ export default function ChatPage() {
 
   return (
     <Layout style={{
-      height: isMobile ? '100vh' : 'calc(100vh - 112px)',
-      margin: isMobile ? 0 : '-24px',
+      height: (isMobile || embedMode) ? '100vh' : 'calc(100vh - 112px)',
+      margin: (isMobile || embedMode) ? 0 : '-24px',
       background: 'transparent', overflow: 'hidden',
     }}>
       {/* Desktop sidebar */}

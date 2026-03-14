@@ -1,11 +1,17 @@
-"""流式对话引擎 — 基于AG-UI协议输出SSE事件流
+"""流式对话引擎 - 基于AG-UI协议输出SSE事件流
 
-将 DialogEngine 的同步处理流程拆分为异步事件流:
-  RUN_STARTED → STEP(intent) → TOOL_CALL → TEXT_MESSAGE(streaming) → RUN_FINISHED
+完整处理链:
+  RUN_STARTED
+    -> 加载上下文 -> 意图识别 -> 增强实体抽取 -> 参数归一化
+    -> 参数转换 -> 槽位校验(追问) -> TOOL_CALL -> 回复生成
+  -> RUN_FINISHED
+
+每步都记录证据链，支持管理后台查询。
 """
 import json
 import time
 import re
+import traceback
 from typing import AsyncGenerator, Optional
 from sqlalchemy.orm import Session
 
@@ -13,9 +19,15 @@ from app.models.config import LLMConfig, Connector
 from app.models.ontology import Entity
 from app.models.action import Action
 from app.models.intent import Skill, SkillTool
-from app.clients.llm_client import call_llm, call_llm_for_intent
+from app.models.action import ActionParameter
+from app.clients.llm_client import call_llm, call_llm_for_intent, call_llm_for_entities
 from app.clients.connector_client import ConnectorClient
 from app.core import agui
+from app.core.context_manager import (
+    load_context, save_context, merge_entities,
+    normalize_entities, convert_params, check_slots, build_clarification_reply,
+)
+from app.core.evidence import EvidenceCollector
 
 
 async def stream_dialog(
@@ -27,11 +39,59 @@ async def stream_dialog(
     thread_id: str,
     run_id: str,
 ) -> AsyncGenerator[str, None]:
-    """主入口 — 流式返回 AG-UI SSE 事件"""
+    """主入口 - 流式返回 AG-UI SSE 事件"""
 
+    evidence = EvidenceCollector(session_id, tenant_id, customer_id)
     yield agui.run_started(thread_id, run_id)
 
-    # ── Step 1: 加载技能 ──
+    try:
+        async for evt in _stream_dialog_inner(
+            db, tenant_id, customer_id, session_id, message,
+            thread_id, run_id, evidence,
+        ):
+            yield evt
+    except Exception as exc:
+        evidence.add_error("stream_dialog", str(exc), traceback.format_exc())
+        yield agui.run_error(f"处理出错: {exc}")
+
+    # 保存证据链到 ActionLog
+    try:
+        evidence.save_action_log(
+            db, action_type="stream_dialog",
+            params={"message": message},
+            status="success" if not evidence.errors else "error",
+            result=evidence.to_dict(),
+            error_message=evidence.errors[0]["error"] if evidence.errors else None,
+        )
+        db.flush()
+    except Exception:
+        pass
+
+    yield agui.run_finished(thread_id, run_id)
+
+
+async def _stream_dialog_inner(
+    db: Session,
+    tenant_id: int,
+    customer_id: str,
+    session_id: str,
+    message: str,
+    thread_id: str,
+    run_id: str,
+    evidence: EvidenceCollector,
+) -> AsyncGenerator[str, None]:
+
+    # -- Step 1: 加载上下文 --
+    t0 = time.time()
+    ctx = load_context(db, session_id)
+    ctx["turn_count"] = ctx.get("turn_count", 0) + 1
+    evidence.add_step("load_context", {
+        "turn": ctx["turn_count"],
+        "existing_entities": ctx.get("entities", {}),
+        "last_intent": ctx.get("last_intent"),
+    }, int((time.time() - t0) * 1000))
+
+    # -- Step 2: 加载技能 --
     skills = (
         db.query(Skill)
         .filter(Skill.tenant_id == tenant_id, Skill.status == "published")
@@ -40,28 +100,32 @@ async def stream_dialog(
     )
 
     if not skills:
-        async for evt in _stream_text(
-            "系统正在配置中，暂时无法回答您的问题。请稍后再试。"
-        ):
+        async for evt in _stream_text("系统正在配置中，暂时无法回答您的问题。请稍后再试。"):
             yield evt
-        yield agui.run_finished(thread_id, run_id)
         return
 
-    # ── Step 2: 意图识别 ──
+    # -- Step 3: 意图识别 --
     yield agui.step_started("intent_recognition")
+    t0 = time.time()
 
-    matched_skill, confidence, entities = _recognize_intent(
-        db, tenant_id, message, skills
+    matched_skill, confidence, rule_entities = _recognize_intent(
+        db, tenant_id, message, skills, ctx
     )
 
     if not matched_skill:
+        evidence.add_step("intent_recognition", {"result": "no_match"}, int((time.time() - t0) * 1000))
         yield agui.step_finished("intent_recognition")
         async for evt in _stream_text(
             "抱歉，我暂时无法理解您的问题。您可以试试：查看产线进度、查询现场人员、提交投诉等。"
         ):
             yield evt
-        yield agui.run_finished(thread_id, run_id)
         return
+
+    evidence.add_step("intent_recognition", {
+        "skill": matched_skill.skill_code,
+        "confidence": confidence,
+        "rule_entities": rule_entities,
+    }, int((time.time() - t0) * 1000))
 
     yield agui.custom_event("intent", {
         "code": matched_skill.skill_code,
@@ -70,7 +134,43 @@ async def stream_dialog(
     })
     yield agui.step_finished("intent_recognition")
 
-    # ── Step 3: 加载工具链 ──
+    # 更新上下文: 记住当前意图
+    ctx["last_intent"] = matched_skill.skill_code
+    history_intents = ctx.get("history_intents", [])
+    history_intents.append(matched_skill.skill_code)
+    ctx["history_intents"] = history_intents[-10:]
+
+    # -- Step 4: 增强实体抽取 --
+    yield agui.step_started("entity_extraction")
+    t0 = time.time()
+
+    # 合并: 上下文旧实体 + 规则抽取的新实体
+    entities = merge_entities(ctx.get("entities", {}), rule_entities)
+
+    # LLM 增强抽取
+    llm_entities = _enhanced_entity_extraction(db, tenant_id, message, matched_skill, entities, ctx)
+    if llm_entities:
+        entities = merge_entities(entities, llm_entities)
+        evidence.add_step("llm_entity_extraction", {"extracted": llm_entities})
+
+    # 参数归一化 (日期、枚举等)
+    entities = normalize_entities(entities, message)
+    evidence.add_step("normalize_entities", {"normalized": entities})
+
+    # 参数转换 (名称->ID等)
+    entities = convert_params(db, entities, matched_skill)
+
+    evidence.add_step("entity_extraction", {
+        "final_entities": entities,
+    }, int((time.time() - t0) * 1000))
+
+    # 更新上下文实体
+    ctx["entities"] = entities
+    save_context(db, session_id, ctx)
+
+    yield agui.step_finished("entity_extraction")
+
+    # -- Step 5: 加载工具链 --
     tools = (
         db.query(SkillTool)
         .filter(SkillTool.skill_id == matched_skill.id)
@@ -78,9 +178,8 @@ async def stream_dialog(
         .all()
     )
 
-    # 无工具链 → 用LLM生成回答或返回模板
+    # 无工具链 -> 用LLM生成回答或返回模板
     if not tools:
-        # 有 response_prompt → 走LLM流式生成
         if matched_skill.response_prompt:
             llm_config = _get_llm_config(db, tenant_id, "response") or _get_llm_config(db, tenant_id, "general")
             if llm_config:
@@ -88,29 +187,52 @@ async def stream_dialog(
                 async for evt in _stream_llm_reply(llm_config, message, matched_skill, {}):
                     yield evt
                 yield agui.step_finished("reply_generation")
-                yield agui.run_finished(thread_id, run_id)
                 return
         reply = matched_skill.response_template or "您好！请问有什么可以帮助您的？"
         async for evt in _stream_text(reply):
             yield evt
-        yield agui.run_finished(thread_id, run_id)
         return
 
-    # ── Step 4: 执行工具链（带 TOOL_CALL 事件）──
+    # -- Step 6: 槽位校验 + 追问 --
+    slot_result = check_slots(db, matched_skill, entities)
+    if not slot_result.complete:
+        evidence.add_step("slot_check", {
+            "complete": False,
+            "missing": [p["name"] for p in slot_result.missing_required],
+        })
+        clarification = build_clarification_reply(slot_result)
+        if clarification:
+            yield agui.custom_event("clarification", {
+                "missing_params": slot_result.missing_required,
+                "text": clarification,
+            })
+            async for evt in _stream_text(clarification):
+                yield evt
+            save_context(db, session_id, ctx)
+            return
+    else:
+        evidence.add_step("slot_check", {"complete": True})
+
+    # -- Step 7: 执行工具链 --
     yield agui.step_started("tool_execution")
-    msg_id = agui.new_id()
+    t0 = time.time()
 
     query_results = {}
     for tool in tools:
-        tool_result = _execute_tool_with_events(db, tool, entities, customer_id)
+        tool_result = _execute_tool_with_events(db, tool, entities, customer_id, evidence)
         for evt in tool_result["events"]:
             yield evt
         if tool_result["data"]:
             query_results[f"tool_{tool.order_no}"] = tool_result["data"]
 
+    evidence.add_step("tool_execution", {
+        "tools_count": len(tools),
+        "results_count": len(query_results),
+    }, int((time.time() - t0) * 1000))
+
     yield agui.step_finished("tool_execution")
 
-    # ── Step 5: 生成回答（流式文本）──
+    # -- Step 8: 生成回答 --
     yield agui.step_started("reply_generation")
 
     if matched_skill.response_template and query_results:
@@ -118,7 +240,6 @@ async def stream_dialog(
         async for evt in _stream_text(reply):
             yield evt
     elif query_results:
-        # 尝试 LLM 流式生成
         llm_config = _get_llm_config(db, tenant_id, "response")
         if llm_config:
             async for evt in _stream_llm_reply(llm_config, message, matched_skill, query_results):
@@ -133,21 +254,19 @@ async def stream_dialog(
 
     yield agui.step_finished("reply_generation")
 
-    # 附带结构化数据
     if query_results:
         yield agui.custom_event("structured_data", query_results)
 
-    yield agui.run_finished(thread_id, run_id)
+    yield agui.custom_event("evidence", evidence.to_dict())
 
 
-# ── 辅助函数 ──
+# == 辅助函数 ==
 
 
 async def _stream_text(text: str):
     """将整段文本拆分为流式 TEXT_MESSAGE 事件"""
     mid = agui.new_id()
     yield agui.text_message_start(mid)
-    # 按标点分段流式输出
     chunks = re.split(r'(?<=[。！？，；、\n])', text)
     for chunk in chunks:
         if chunk:
@@ -155,8 +274,9 @@ async def _stream_text(text: str):
     yield agui.text_message_end(mid)
 
 
-def _recognize_intent(db: Session, tenant_id: int, message: str, skills: list[Skill]):
-    """意图识别（规则优先,LLM兜底）— 同步"""
+def _recognize_intent(db: Session, tenant_id: int, message: str,
+                      skills: list, ctx: dict = None):
+    """意图识别（规则优先,LLM兜底）"""
     candidates = []
     for skill in skills:
         score = 0
@@ -172,10 +292,13 @@ def _recognize_intent(db: Session, tenant_id: int, message: str, skills: list[Sk
 
         patterns = skill.match_patterns or []
         for pattern in patterns:
-            match = re.search(pattern, message)
-            if match:
-                score = max(score, 0.9)
-                entities.update(match.groupdict())
+            try:
+                match = re.search(pattern, message)
+                if match:
+                    score = max(score, 0.9)
+                    entities.update(match.groupdict())
+            except re.error:
+                pass
 
         if score > 0:
             candidates.append((skill, score, entities))
@@ -199,6 +322,7 @@ def _recognize_intent(db: Session, tenant_id: int, message: str, skills: list[Sk
                 api_key=llm_config.api_key,
                 user_message=message,
                 available_intents=available_intents,
+                context=ctx.get("entities") if ctx else None,
             )
             intent_code = llm_result.get("intent")
             confidence = llm_result.get("confidence", 0)
@@ -213,14 +337,91 @@ def _recognize_intent(db: Session, tenant_id: int, message: str, skills: list[Sk
     return None, 0, {}
 
 
+def _enhanced_entity_extraction(
+    db: Session, tenant_id: int, message: str,
+    skill: Skill, known_entities: dict, ctx: dict,
+) -> dict:
+    """LLM 增强实体抽取"""
+    llm_config = _get_llm_config(db, tenant_id, "entity") or _get_llm_config(db, tenant_id, "general")
+    if not llm_config:
+        return {}
+
+    entity_defs = _get_entity_definitions(db, skill)
+    if not entity_defs:
+        return {}
+
+    try:
+        result = call_llm_for_entities(
+            provider=llm_config.provider,
+            model=llm_config.model_name,
+            api_url=llm_config.api_url,
+            api_key=llm_config.api_key,
+            user_message=message,
+            intent_code=skill.skill_code,
+            known_entities=known_entities,
+            entity_definitions=entity_defs,
+            context=ctx.get("entities"),
+        )
+        return result.get("entities", {})
+    except Exception:
+        return {}
+
+
+def _get_entity_definitions(db: Session, skill: Skill) -> list:
+    """从技能工具链中收集参数定义"""
+    defs = []
+    tools = (
+        db.query(SkillTool)
+        .filter(SkillTool.skill_id == skill.id)
+        .order_by(SkillTool.order_no)
+        .all()
+    )
+    seen = set()
+    for tool in tools:
+        api_config = tool.config.get("api_config") if tool.config else None
+        if api_config:
+            for p_list_key in ("required_params", "optional_params"):
+                for p in api_config.get(p_list_key, []):
+                    pname = p if isinstance(p, str) else p.get("name", "")
+                    if pname and pname not in seen:
+                        seen.add(pname)
+                        defs.append({
+                            "name": pname,
+                            "title": pname if isinstance(p, str) else p.get("title", pname),
+                            "type": "string" if isinstance(p, str) else p.get("type", "string"),
+                            "required": p_list_key == "required_params",
+                            "description": "" if isinstance(p, str) else p.get("description", ""),
+                        })
+            continue
+
+        if tool.action_id:
+            action_params = (
+                db.query(ActionParameter)
+                .filter(ActionParameter.action_id == tool.action_id, ActionParameter.direction == "input")
+                .all()
+            )
+            for ap in action_params:
+                if ap.name not in seen:
+                    seen.add(ap.name)
+                    defs.append({
+                        "name": ap.name,
+                        "title": ap.title or ap.name,
+                        "type": ap.type,
+                        "required": ap.is_required,
+                        "description": ap.param_description or "",
+                    })
+    return defs
+
+
 def _execute_tool_with_events(
-    db: Session, tool: SkillTool, entities: dict, customer_id: str
+    db: Session, tool: SkillTool, entities: dict, customer_id: str,
+    evidence: EvidenceCollector = None,
 ) -> dict:
     """执行单个工具, 返回 { events: [...], data: ... }"""
     events = []
     tc_id = agui.new_id()
+    t0 = time.time()
 
-    # 优先使用 api_config 模式（殷明方案: 接口调用直接包装）
     api_config = tool.config.get("api_config") if tool.config else None
 
     if api_config and tool.tools_mode == "api":
@@ -231,12 +432,11 @@ def _execute_tool_with_events(
         events.append(agui.tool_call_args(tc_id, json.dumps(params, ensure_ascii=False)))
         events.append(agui.tool_call_end(tc_id))
 
-        # 获取连接器
         connector_id = api_config.get("connector_id")
         connector = db.query(Connector).filter(Connector.id == connector_id).first() if connector_id else None
 
         if connector:
-            client = ConnectorClient({
+            cli = ConnectorClient({
                 "base_url": connector.base_url,
                 "auth_type": connector.auth_type,
                 "auth_config": connector.auth_config,
@@ -244,7 +444,7 @@ def _execute_tool_with_events(
                 "mock_enabled": connector.mock_enabled,
             })
             try:
-                result = client.call_action(
+                result = cli.call_action(
                     action_config={
                         "http_method": api_config.get("http_method", "GET"),
                         "api_path": api_config.get("api_path", ""),
@@ -257,8 +457,14 @@ def _execute_tool_with_events(
                 events.append(agui.tool_call_result(
                     tc_id, json.dumps(result, ensure_ascii=False, default=str)
                 ))
+                if evidence:
+                    evidence.add_step(f"tool_{tool_name}", {
+                        "source": result.get("source", "api"),
+                    }, int((time.time() - t0) * 1000))
                 return {"events": events, "data": result}
-            except Exception:
+            except Exception as exc:
+                if evidence:
+                    evidence.add_error(f"tool_{tool_name}", str(exc), traceback.format_exc())
                 mock = api_config.get("mock_response")
                 if mock:
                     data = {"data": mock, "source": "mock"}
@@ -273,7 +479,7 @@ def _execute_tool_with_events(
                 return {"events": events, "data": data}
             return {"events": events, "data": None}
 
-    # 回退: 原有 entity+action 方式
+    # 回退: entity+action 方式
     if not tool.entity_id:
         return {"events": [], "data": None}
 
@@ -306,7 +512,7 @@ def _execute_tool_with_events(
             return {"events": events, "data": data}
         return {"events": events, "data": None}
 
-    client = ConnectorClient({
+    cli = ConnectorClient({
         "base_url": connector.base_url,
         "auth_type": connector.auth_type,
         "auth_config": connector.auth_config,
@@ -315,7 +521,7 @@ def _execute_tool_with_events(
     })
 
     try:
-        result = client.call_action(
+        result = cli.call_action(
             action_config={
                 "http_method": action.http_method,
                 "api_path": action.api_path,
@@ -328,15 +534,21 @@ def _execute_tool_with_events(
         events.append(agui.tool_call_result(
             tc_id, json.dumps(result, ensure_ascii=False, default=str)
         ))
+        if evidence:
+            evidence.add_step(f"tool_{tool_name}", {
+                "source": result.get("source", "api"),
+            }, int((time.time() - t0) * 1000))
         return {"events": events, "data": result}
-    except Exception:
+    except Exception as exc:
+        if evidence:
+            evidence.add_error(f"tool_{tool_name}", str(exc), traceback.format_exc())
         return {"events": events, "data": None}
 
 
 async def _stream_llm_reply(
     llm_config: LLMConfig, message: str, skill: Skill, data: dict
 ) -> AsyncGenerator[str, None]:
-    """尝试用 LLM 流式生成回答"""
+    """用 LLM 流式生成回答"""
     import httpx
 
     prompt = skill.response_prompt or "请根据以下数据，用友好的中文回答用户的问题。"
@@ -366,8 +578,8 @@ async def _stream_llm_reply(
 
     full_text = ""
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            async with client.stream("POST", url, headers=headers, json=payload) as resp:
+        async with httpx.AsyncClient(timeout=60) as http_client:
+            async with http_client.stream("POST", url, headers=headers, json=payload) as resp:
                 async for line in resp.aiter_lines():
                     if not line.startswith("data: "):
                         continue

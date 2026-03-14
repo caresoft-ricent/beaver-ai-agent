@@ -10,6 +10,8 @@ import LLMConfigList from './pages/LLMConfigList';
 import EntityList from './pages/EntityList';
 import SkillList from './pages/SkillList';
 import ChatPage from './pages/ChatPage';
+import ChatEmbed from './pages/ChatEmbed';
+import LogsPage from './pages/LogsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('token');
@@ -23,6 +25,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/chat-embed" element={<ChatEmbed />} />
           <Route path="/" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
             <Route index element={<Dashboard />} />
             <Route path="tenants" element={<TenantList />} />
@@ -30,6 +33,7 @@ function App() {
             <Route path="llm" element={<LLMConfigList />} />
             <Route path="ontology" element={<EntityList />} />
             <Route path="intents" element={<SkillList />} />
+            <Route path="logs" element={<LogsPage />} />
             <Route path="chat" element={<ChatPage />} />
           </Route>
         </Routes>

@@ -109,3 +109,68 @@ def call_llm_for_intent(
         parsed = {"intent": "CHITCHAT", "confidence": 0.1, "entities": {}}
 
     return {**parsed, "tokens_used": result.get("tokens_used", 0)}
+
+
+def call_llm_for_entities(
+    provider: str,
+    model: str,
+    api_url: str,
+    api_key: str,
+    user_message: str,
+    intent_code: str,
+    known_entities: dict,
+    entity_definitions: list[dict],
+    context: Optional[dict] = None,
+) -> dict:
+    """LLM增强实体抽取 — 从用户输入中提取结构化参数
+
+    entity_definitions: [{"name": "line_name", "title": "产线名称", "type": "string", "required": true}, ...]
+    返回: {"entities": {"line_name": "A线", ...}, "tokens_used": 123}
+    """
+    entities_desc = "\n".join([
+        f"- {e['name']}({e.get('title', e['name'])}): 类型={e.get('type', 'string')}, "
+        f"{'必填' if e.get('required') else '选填'}, {e.get('description', '')}"
+        for e in entity_definitions
+    ])
+
+    context_str = ""
+    if context:
+        context_str = f"\n上下文已知信息：{json.dumps(context, ensure_ascii=False)}"
+
+    known_str = ""
+    if known_entities:
+        known_str = f"\n已通过规则提取的实体：{json.dumps(known_entities, ensure_ascii=False)}"
+
+    system_prompt = f"""你是一个实体抽取助手。请从用户输入中提取以下参数。
+
+当前意图: {intent_code}
+需要提取的参数:
+{entities_desc}
+{known_str}{context_str}
+
+规则:
+1. 只提取用户明确提到或可推断的参数
+2. 日期类参数统一转为 YYYY-MM-DD 格式
+3. 如果参数无法从输入中确定，不要凭空猜测
+4. 返回严格JSON格式: {{"entities": {{"param_name": "value", ...}}}}"""
+
+    result = call_llm(
+        provider=provider,
+        model=model,
+        api_url=api_url,
+        api_key=api_key,
+        messages=[{"role": "user", "content": user_message}],
+        system_prompt=system_prompt,
+        temperature=0.2,
+        max_tokens=256,
+    )
+
+    content = result["content"].strip()
+    if content.startswith("```"):
+        content = content.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError:
+        parsed = {"entities": {}}
+
+    return {"entities": parsed.get("entities", {}), "tokens_used": result.get("tokens_used", 0)}

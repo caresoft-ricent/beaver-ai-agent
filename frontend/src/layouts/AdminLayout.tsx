@@ -14,6 +14,7 @@ import {
   LogoutOutlined,
   UserOutlined,
   KeyOutlined,
+  FileSearchOutlined,
 } from '@ant-design/icons';
 import { changePassword } from '../api/admin';
 
@@ -26,6 +27,7 @@ const menuItems = [
   { key: '/llm', icon: <RobotOutlined />, label: '大模型配置' },
   { key: '/ontology', icon: <ApartmentOutlined />, label: '业务本体' },
   { key: '/intents', icon: <ThunderboltOutlined />, label: '技能/意图' },
+  { key: '/logs', icon: <FileSearchOutlined />, label: '日志查询' },
   { type: 'divider' as const },
   { key: '/chat', icon: <CommentOutlined />, label: '对话测试' },
 ];
