@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   Table, Button, Modal, Form, Input, Select, message, Space, Tag, Popconfirm,
   Alert, Card, Descriptions, Collapse, InputNumber, Typography, Divider, Empty,
+  Switch,
 } from 'antd';
 import {
   PlusOutlined, SendOutlined, ThunderboltOutlined, DeleteOutlined,
@@ -10,7 +11,7 @@ import {
 import {
   getSkills, createSkill, updateSkill, deleteSkill, publishSkill,
   getSkillTools, createSkillTool, deleteSkillTool,
-  getEntities, getActions,
+  getEntities, getActions, getLLMConfigs,
 } from '../api/admin';
 
 const { Text } = Typography;
@@ -66,6 +67,7 @@ export default function SkillList() {
   const [entityOptions, setEntityOptions] = useState<EntityItem[]>([]);
   const [actionOptions, setActionOptions] = useState<ActionItem[]>([]);
   const [toolForm] = Form.useForm();
+  const [llmOptions, setLlmOptions] = useState<{id: number; name: string}[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -84,7 +86,14 @@ export default function SkillList() {
     } catch { /* ignore */ }
   }, []);
 
-  useEffect(() => { load(); loadEntities(); }, [load, loadEntities]);
+  const loadLLMConfigs = useCallback(async () => {
+    try {
+      const res = await getLLMConfigs();
+      setLlmOptions((res.data.data?.items || []).map((c: Record<string, unknown>) => ({ id: c.id as number, name: c.name as string })));
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { load(); loadEntities(); loadLLMConfigs(); }, [load, loadEntities, loadLLMConfigs]);
 
   const handleEntityChangeForTool = async (entityId: number) => {
     toolForm.setFieldValue('action_id', undefined);
@@ -184,19 +193,32 @@ export default function SkillList() {
     },
     { title: '版本', dataIndex: 'version', width: 60, align: 'center' as const },
     {
-      title: '状态', dataIndex: 'status', width: 80,
-      render: (s: string) => <Tag color={s === 'published' ? 'green' : 'orange'}>{s === 'published' ? '已发布' : '草稿'}</Tag>,
+      title: '状态', dataIndex: 'status', width: 100,
+      render: (s: string, record: Skill) => (
+        <Switch
+          checked={s === 'published'}
+          checkedChildren="已发布"
+          unCheckedChildren="草稿"
+          onChange={async (checked) => {
+            if (checked) {
+              await publishSkill(record.id);
+              message.success('发布成功');
+            } else {
+              await updateSkill(record.id, { status: 'draft' });
+              message.success('已取消发布');
+            }
+            load();
+          }}
+        />
+      ),
     },
     {
       title: '操作', width: 280,
       render: (_: unknown, record: Skill) => (
         <Space>
           <Button size="small" icon={<LinkOutlined />} onClick={() => openToolChain(record.id)}>工具链</Button>
-          {record.status === 'draft' && (
-            <Button size="small" type="primary" icon={<SendOutlined />} onClick={() => handlePublish(record.id)}>发布</Button>
-          )}
           <Button size="small" onClick={() => openEdit(record)}>编辑</Button>
-          <Popconfirm title="确认删除?" onConfirm={() => deleteSkill(record.id).then(load)}>
+          <Popconfirm title="确认删除?" okText="确认" cancelText="取消" onConfirm={() => deleteSkill(record.id).then(load)}>
             <Button size="small" danger>删除</Button>
           </Popconfirm>
         </Space>
@@ -262,7 +284,8 @@ export default function SkillList() {
       />
 
       {/* 新建/编辑技能 Modal */}
-      <Modal title={editingId ? '编辑技能' : '新建技能'} open={modalOpen} onOk={handleSubmit} onCancel={() => setModalOpen(false)} width={680} destroyOnClose>
+      <Modal title={editingId ? '编辑技能' : '新建技能'} open={modalOpen} onOk={handleSubmit} onCancel={() => setModalOpen(false)} width={680} destroyOnClose
+        okText="确认" cancelText="取消">
         <Form form={form} layout="vertical" initialValues={{ tenant_id: 1, sort_order: 0 }}>
           <Form.Item name="tenant_id" hidden><Input /></Form.Item>
 
@@ -330,7 +353,8 @@ export default function SkillList() {
           </div>
 
           <Form.Item name="llm_config_id" label="关联大模型">
-            <InputNumber placeholder="填写大模型配置ID（可选）" style={{ width: '100%' }} />
+            <Select placeholder="请选择大模型配置（可选）" allowClear style={{ width: '100%' }}
+              options={llmOptions.map(c => ({ value: c.id, label: c.name }))} />
           </Form.Item>
         </Form>
       </Modal>
@@ -367,7 +391,7 @@ export default function SkillList() {
                   {
                     title: '', width: 60,
                     render: (_: unknown, record: SkillToolItem) => (
-                      <Popconfirm title="确认删除此工具?" onConfirm={() => handleDeleteTool(record.id)}>
+                      <Popconfirm title="确认删除此工具?" okText="确认" cancelText="取消" onConfirm={() => handleDeleteTool(record.id)}>
                         <Button size="small" danger icon={<DeleteOutlined />} />
                       </Popconfirm>
                     ),

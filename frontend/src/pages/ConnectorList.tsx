@@ -36,8 +36,9 @@ export default function ConnectorList() {
   const handleSubmit = async () => {
     const values = await form.validateFields();
     // 将 auth header/key 组装成 auth_config
-    const { auth_header_name, auth_key_value, mock_switch, ...rest } = values;
+    const { auth_header_name, auth_key_value, mock_switch, _status_switch, ...rest } = values;
     rest.mock_enabled = mock_switch ? '1' : '0';
+    rest.status = _status_switch ? 'active' : 'inactive';
     if (auth_header_name || auth_key_value) {
       rest.auth_config = {
         header_name: auth_header_name || 'Authorization',
@@ -59,7 +60,7 @@ export default function ConnectorList() {
 
   const handleEdit = (record: Connector) => {
     setEditingId(record.id);
-    const formData: Record<string, unknown> = { ...record, mock_switch: record.mock_enabled === '1' };
+    const formData: Record<string, unknown> = { ...record, mock_switch: record.mock_enabled === '1', _status_switch: record.status === 'active' };
     // 解析 auth_config 到表单字段
     const authConfig = (record as Record<string, unknown>).auth_config as Record<string, string> | undefined;
     if (authConfig) {
@@ -104,13 +105,24 @@ export default function ConnectorList() {
           title: 'Mock', dataIndex: 'mock_enabled',
           render: (v: string) => v === '1' ? <Tag color="orange">Mock</Tag> : <Tag color="green">真实</Tag>,
         },
-        { title: '状态', dataIndex: 'status', render: (s: string) => <Tag color={s === 'active' ? 'green' : 'default'}>{s}</Tag> },
+        {
+          title: '状态', dataIndex: 'status', width: 100,
+          render: (s: string, record: Connector) => (
+            <Switch checked={s === 'active'} checkedChildren="启用" unCheckedChildren="停用"
+              onChange={async (checked) => {
+                await updateConnector(record.id, { status: checked ? 'active' : 'inactive' });
+                message.success(checked ? '已启用' : '已停用');
+                load();
+              }}
+            />
+          ),
+        },
         {
           title: '操作', render: (_: unknown, record: Connector) => (
             <Space>
               <Button size="small" icon={<PlayCircleOutlined />} onClick={() => handleTest(record.id)}>测试</Button>
               <Button size="small" onClick={() => handleEdit(record)}>编辑</Button>
-              <Popconfirm title="确认删除?" onConfirm={() => deleteConnector(record.id).then(load)}>
+              <Popconfirm title="确认删除?" okText="确认" cancelText="取消" onConfirm={() => deleteConnector(record.id).then(load)}>
                 <Button size="small" danger>删除</Button>
               </Popconfirm>
             </Space>
@@ -118,8 +130,9 @@ export default function ConnectorList() {
         },
       ]} />
 
-      <Modal title={editingId ? '编辑连接器' : '新建连接器'} open={modalOpen} onOk={handleSubmit} onCancel={() => setModalOpen(false)} width={640}>
-        <Form form={form} layout="vertical" initialValues={{ type: 'beaver_cloud', auth_type: 'api_key', tenant_id: 1, mock_switch: false }}>
+      <Modal title={editingId ? '编辑连接器' : '新建连接器'} open={modalOpen} onOk={handleSubmit} onCancel={() => setModalOpen(false)} width={640}
+        okText="确认" cancelText="取消">
+        <Form form={form} layout="vertical" initialValues={{ type: 'beaver_cloud', auth_type: 'api_key', tenant_id: 1, mock_switch: false, _status_switch: true }}>
           <Form.Item name="tenant_id" label="租户ID" rules={[{ required: true }]}>
             <Input type="number" />
           </Form.Item>
@@ -150,6 +163,9 @@ export default function ConnectorList() {
           </Form.Item>
           <Form.Item name="mock_switch" label="启用 Mock 模式" valuePropName="checked">
             <Switch checkedChildren="Mock" unCheckedChildren="真实" />
+          </Form.Item>
+          <Form.Item name="_status_switch" label="启用状态" valuePropName="checked">
+            <Switch checkedChildren="启用" unCheckedChildren="停用" />
           </Form.Item>
         </Form>
       </Modal>

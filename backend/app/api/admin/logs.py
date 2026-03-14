@@ -151,3 +151,22 @@ def list_error_logs(
         ],
         "total": total,
     })
+
+
+@router.delete("/clear")
+def clear_logs(
+    log_type: str = Query("all", description="action/message/error/all"),
+    tenant_id: int = Query(1),
+    db: Session = Depends(get_db),
+):
+    """清空日志"""
+    deleted = 0
+    if log_type in ("action", "error", "all"):
+        q = db.query(ActionLog).filter(ActionLog.tenant_id == tenant_id)
+        if log_type == "error":
+            q = q.filter(ActionLog.status.in_(["error", "failed"]))
+        deleted += q.delete(synchronize_session=False)
+    if log_type in ("message", "all"):
+        deleted += db.query(ChatMessage).delete(synchronize_session=False)
+    db.commit()
+    return ResponseBase(message=f"已清空 {deleted} 条日志")

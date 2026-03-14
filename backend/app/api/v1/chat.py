@@ -109,14 +109,14 @@ async def chat_stream(req: AGUIStreamRequest, request: Request, db: Session = De
         db.add(session)
         db.flush()
 
-    # 保存用户消息
+    # 保存用户消息并立即提交, 确保会话和消息在流式响应前持久化
     user_msg = ChatMessage(
         session_id=session.session_id,
         role="user",
         content=message,
     )
     db.add(user_msg)
-    db.flush()
+    db.commit()
 
     thread_id = session.session_id
     run_id = req.run_id or agui.new_id()

@@ -119,7 +119,7 @@ export default function NormalizationPage() {
       render: (_: unknown, record: Rule) => (
         <Space size="small">
           <Button type="link" size="small" onClick={() => openEdit(record)}>编辑</Button>
-          <Popconfirm title="确认删除？" onConfirm={() => handleDelete(record.id)}>
+          <Popconfirm title="确认删除？" okText="确认" cancelText="取消" onConfirm={() => handleDelete(record.id)}>
             <Button type="link" size="small" danger>删除</Button>
           </Popconfirm>
         </Space>
@@ -140,7 +140,7 @@ export default function NormalizationPage() {
       render: (_: unknown, record: Rule) => (
         <Space size="small">
           <Button type="link" size="small" onClick={() => openEdit(record)}>编辑</Button>
-          <Popconfirm title="确认删除？" onConfirm={() => handleDelete(record.id)}>
+          <Popconfirm title="确认删除？" okText="确认" cancelText="取消" onConfirm={() => handleDelete(record.id)}>
             <Button type="link" size="small" danger>删除</Button>
           </Popconfirm>
         </Space>
@@ -160,7 +160,7 @@ export default function NormalizationPage() {
       render: (_: unknown, record: Rule) => (
         <Space size="small">
           <Button type="link" size="small" onClick={() => openEdit(record)}>编辑</Button>
-          <Popconfirm title="确认删除？" onConfirm={() => handleDelete(record.id)}>
+          <Popconfirm title="确认删除？" okText="确认" cancelText="取消" onConfirm={() => handleDelete(record.id)}>
             <Button type="link" size="small" danger>删除</Button>
           </Popconfirm>
         </Space>
@@ -210,6 +210,7 @@ export default function NormalizationPage() {
         onCancel={() => { setModalOpen(false); setEditing(null); form.resetFields(); }}
         destroyOnClose
         width={600}
+        okText="确认" cancelText="取消"
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="category" label="类别" hidden={!editing}>

@@ -428,7 +428,7 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
 
   return (
     <Layout style={{
-      height: (isMobile || embedMode) ? '100vh' : 'calc(100vh - 112px)',
+      height: (isMobile || embedMode) ? '100vh' : 'calc(100vh - 96px)',
       margin: (isMobile || embedMode) ? 0 : '-24px',
       background: 'transparent', overflow: 'hidden',
     }}>

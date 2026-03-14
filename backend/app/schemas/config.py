@@ -38,6 +38,7 @@ class LLMConfigOut(BaseModel):
     provider: str
     model_name: str
     api_url: str
+    api_key: Optional[str] = None
     temperature: float
     max_tokens: int
     usage: str

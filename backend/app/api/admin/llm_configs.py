@@ -73,7 +73,7 @@ def delete_llm_config(config_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{config_id}/test")
-def test_llm_config(config_id: int, req: LLMTestRequest, db: Session = Depends(get_db)):
+def test_llm_config(config_id: int, req: LLMTestRequest = LLMTestRequest(), db: Session = Depends(get_db)):
     """在线测试大模型"""
     config = db.query(LLMConfig).filter(LLMConfig.id == config_id).first()
     if not config:

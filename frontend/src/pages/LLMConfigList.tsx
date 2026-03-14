@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, Input, Select, message, Space, Tag, Popconfirm } from 'antd';
+import { Table, Button, Modal, Form, Input, Select, message, Space, Tag, Popconfirm, Switch } from 'antd';
 import { PlusOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import { getLLMConfigs, createLLMConfig, updateLLMConfig, deleteLLMConfig, testLLMConfig } from '../api/admin';
 
@@ -9,6 +9,8 @@ interface LLMConfig {
   name: string;
   provider: string;
   model_name: string;
+  api_url: string;
+  api_key?: string;
   usage: string;
   status: string;
 }
@@ -34,6 +36,10 @@ export default function LLMConfigList() {
 
   const handleSubmit = async () => {
     const values = await form.validateFields();
+    if (values._status_switch !== undefined) {
+      values.status = values._status_switch ? 'active' : 'disabled';
+      delete values._status_switch;
+    }
     if (editingId) {
       await updateLLMConfig(editingId, values);
       message.success('更新成功');
@@ -50,10 +56,12 @@ export default function LLMConfigList() {
   const handleTest = async (id: number) => {
     try {
       const res = await testLLMConfig(id);
-      if (res.data.data?.success) {
-        message.success('测试成功: ' + (res.data.data?.reply || ''));
+      if (res.data.code !== 0) {
+        message.warning('测试失败: ' + (res.data.message || '未知错误'));
+      } else if (res.data.data?.content) {
+        message.success('测试成功: ' + res.data.data.content.slice(0, 80));
       } else {
-        message.warning('测试失败: ' + (res.data.data?.error || '未知错误'));
+        message.warning('测试失败: 无回复内容');
       }
     } catch {
       message.error('测试出错');
@@ -77,13 +85,28 @@ export default function LLMConfigList() {
           const colorMap: Record<string, string> = { intent: 'purple', response: 'green', entity: 'orange', general: 'default' };
           return <Tag color={colorMap[u] || 'default'}>{u}</Tag>;
         }},
-        { title: '状态', dataIndex: 'status', render: (s: string) => <Tag color={s === 'active' ? 'green' : 'default'}>{s}</Tag> },
+        { title: '状态', dataIndex: 'status', render: (s: string, record: LLMConfig) => (
+          <Switch
+            checked={s === 'active'}
+            checkedChildren="启用"
+            unCheckedChildren="停用"
+            onChange={async (checked) => {
+              await updateLLMConfig(record.id, { status: checked ? 'active' : 'disabled' });
+              message.success('状态已更新');
+              load();
+            }}
+          />
+        )},
         {
           title: '操作', render: (_: unknown, record: LLMConfig) => (
             <Space>
               <Button size="small" icon={<PlayCircleOutlined />} onClick={() => handleTest(record.id)}>测试</Button>
-              <Button size="small" onClick={() => { setEditingId(record.id); form.setFieldsValue(record); setModalOpen(true); }}>编辑</Button>
-              <Popconfirm title="确认删除?" onConfirm={() => deleteLLMConfig(record.id).then(load)}>
+              <Button size="small" onClick={() => {
+                setEditingId(record.id);
+                form.setFieldsValue({ ...record, _status_switch: record.status === 'active' });
+                setModalOpen(true);
+              }}>编辑</Button>
+              <Popconfirm title="确认删除?" okText="确认" cancelText="取消" onConfirm={() => deleteLLMConfig(record.id).then(load)}>
                 <Button size="small" danger>删除</Button>
               </Popconfirm>
             </Space>
@@ -91,8 +114,9 @@ export default function LLMConfigList() {
         },
       ]} />
 
-      <Modal title={editingId ? '编辑配置' : '新建配置'} open={modalOpen} onOk={handleSubmit} onCancel={() => setModalOpen(false)} width={600}>
-        <Form form={form} layout="vertical" initialValues={{ provider: 'doubao', usage: 'general', tenant_id: 1 }}>
+      <Modal title={editingId ? '编辑配置' : '新建配置'} open={modalOpen} onOk={handleSubmit} onCancel={() => setModalOpen(false)} width={600}
+        okText="确认" cancelText="取消">
+        <Form form={form} layout="vertical" initialValues={{ provider: 'doubao', usage: 'general', tenant_id: 1, _status_switch: true }}>
           <Form.Item name="tenant_id" label="租户ID" rules={[{ required: true }]}>
             <Input type="number" />
           </Form.Item>
@@ -125,6 +149,9 @@ export default function LLMConfigList() {
               { value: 'response', label: '回答生成' },
               { value: 'entity', label: '实体抽取' },
             ]} />
+          </Form.Item>
+          <Form.Item name="_status_switch" label="启用状态" valuePropName="checked">
+            <Switch checkedChildren="启用" unCheckedChildren="停用" />
           </Form.Item>
         </Form>
       </Modal>

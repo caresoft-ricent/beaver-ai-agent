@@ -4,9 +4,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Table, Card, Tabs, Tag, Input, Select, Space, Button, Modal, Typography, Descriptions,
-  message,
+  message, Popconfirm,
 } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import client from '../api/client';
 
@@ -229,6 +229,22 @@ export default function LogsPage() {
         >
           刷新
         </Button>
+        <Popconfirm
+          title="确认清空当前类型的日志?"
+          okText="确认"
+          cancelText="取消"
+          onConfirm={async () => {
+            try {
+              await client.delete('/admin/logs/clear', { params: { log_type: activeTab, tenant_id: 1 } });
+              message.success('清空成功');
+              if (activeTab === 'action') fetchActionLogs();
+              else if (activeTab === 'message') fetchMessageLogs();
+              else fetchErrorLogs();
+            } catch { message.error('清空失败'); }
+          }}
+        >
+          <Button icon={<DeleteOutlined />} danger>清空</Button>
+        </Popconfirm>
       </Space>
     }>
       <Tabs

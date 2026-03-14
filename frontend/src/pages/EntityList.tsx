@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   Table, Button, Modal, Form, Input, Select, message, Space, Tag, Popconfirm,
   Alert, Card, Descriptions, Collapse, InputNumber, Typography, Divider, Empty,
-  Switch,
+  Switch, Tooltip,
 } from 'antd';
 import {
   PlusOutlined, SendOutlined, DeleteOutlined, InfoCircleOutlined,
@@ -203,19 +203,32 @@ export default function EntityList() {
     },
     { title: '版本', dataIndex: 'version', width: 60, align: 'center' as const },
     {
-      title: '状态', dataIndex: 'status', width: 80,
-      render: (s: string) => <Tag color={s === 'published' ? 'green' : 'orange'}>{s === 'published' ? '已发布' : '草稿'}</Tag>,
+      title: '状态', dataIndex: 'status', width: 100,
+      render: (s: string, record: Entity) => (
+        <Switch
+          checked={s === 'published'}
+          checkedChildren="已发布"
+          unCheckedChildren="草稿"
+          onChange={async (checked) => {
+            if (checked) {
+              await publishEntity(record.id);
+              message.success('发布成功');
+            } else {
+              await updateEntity(record.id, { status: 'draft' });
+              message.success('已取消发布');
+            }
+            load();
+          }}
+        />
+      ),
     },
     {
       title: '操作', width: 300,
       render: (_: unknown, record: Entity) => (
         <Space>
           <Button size="small" icon={<SettingOutlined />} onClick={() => openDetail(record)}>属性/操作</Button>
-          {record.status === 'draft' && (
-            <Button size="small" type="primary" icon={<SendOutlined />} onClick={() => handlePublish(record.id)}>发布</Button>
-          )}
           <Button size="small" onClick={() => { setEditingId(record.id); form.setFieldsValue(record); setModalOpen(true); }}>编辑</Button>
-          <Popconfirm title="确认删除? 将同时删除所有属性和操作" onConfirm={() => deleteEntity(record.id).then(load)}>
+          <Popconfirm title="确认删除? 将同时删除所有属性和操作" okText="确认" cancelText="取消" onConfirm={() => deleteEntity(record.id).then(load)}>
             <Button size="small" danger>删除</Button>
           </Popconfirm>
         </Space>
@@ -277,7 +290,8 @@ export default function EntityList() {
       />
 
       {/* 新建/编辑本体 Modal */}
-      <Modal title={editingId ? '编辑本体' : '新建本体'} open={modalOpen} onOk={handleSubmit} onCancel={() => setModalOpen(false)} width={600} destroyOnClose>
+      <Modal title={editingId ? '编辑本体' : '新建本体'} open={modalOpen} onOk={handleSubmit} onCancel={() => setModalOpen(false)} width={600} destroyOnClose
+        okText="确认" cancelText="取消">
         <Form form={form} layout="vertical" initialValues={{ entity_mode: 'api', tenant_id: 1 }}>
           <Form.Item name="tenant_id" hidden><Input /></Form.Item>
 
@@ -338,22 +352,27 @@ export default function EntityList() {
                     { title: '输出', dataIndex: 'is_output', width: 50, align: 'center' as const, render: (v: boolean) => v ? <Tag color="green">是</Tag> : '—' },
                     { title: '必填', dataIndex: 'is_required', width: 50, align: 'center' as const, render: (v: boolean) => v ? <Tag color="red">是</Tag> : '—' },
                     {
-                      title: '增强', width: 100, align: 'center' as const,
-                      render: (_: unknown, record: PropertyItem) => (
-                        <Space size={2}>
-                          {record.llm_description && <Tag color="purple" style={{margin:0}}>描述</Tag>}
-                          {record.extract_expression && <Tag color="cyan" style={{margin:0}}>提取</Tag>}
-                          {record.normalization_config && <Tag color="blue" style={{margin:0}}>归一</Tag>}
-                          {record.mapping_config && <Tag color="orange" style={{margin:0}}>映射</Tag>}
-                        </Space>
-                      ),
+                      title: <Tooltip title="增强字段在对话引擎中用于：LLM描述→精确理解参数含义，提取规则→从消息中抽取参数，归一化→同义词/日期转换，映射→参数值转换(如名称→ID)。点击标签或编辑按钮可维护。">增强 <InfoCircleOutlined style={{fontSize:12}} /></Tooltip>,
+                      width: 120, align: 'center' as const,
+                      render: (_: unknown, record: PropertyItem) => {
+                        const hasTags = record.llm_description || record.extract_expression || record.normalization_config || record.mapping_config;
+                        return (
+                          <Space size={2} style={{ cursor: 'pointer' }} onClick={() => openPropEdit(record)}>
+                            {record.llm_description && <Tag color="purple" style={{margin:0}}>描述</Tag>}
+                            {record.extract_expression && <Tag color="cyan" style={{margin:0}}>提取</Tag>}
+                            {record.normalization_config && <Tag color="blue" style={{margin:0}}>归一</Tag>}
+                            {record.mapping_config && <Tag color="orange" style={{margin:0}}>映射</Tag>}
+                            {!hasTags && <Tag style={{margin:0, cursor:'pointer'}}>点击配置</Tag>}
+                          </Space>
+                        );
+                      },
                     },
                     {
                       title: '', width: 90,
                       render: (_: unknown, record: PropertyItem) => (
                         <Space size="small">
                           <Button size="small" type="link" onClick={() => openPropEdit(record)}>编辑</Button>
-                          <Popconfirm title="删除此属性?" onConfirm={() => handleDeleteProperty(record.id)}>
+                          <Popconfirm title="删除此属性?" okText="确认" cancelText="取消" onConfirm={() => handleDeleteProperty(record.id)}>
                             <Button size="small" danger icon={<DeleteOutlined />} />
                           </Popconfirm>
                         </Space>
@@ -385,6 +404,9 @@ export default function EntityList() {
                 <Form.Item name="is_output" valuePropName="checked" initialValue={true}>
                   <Switch checkedChildren="输出" unCheckedChildren="输出" />
                 </Form.Item>
+                <Form.Item name="is_required" valuePropName="checked" initialValue={false}>
+                  <Switch checkedChildren="必填" unCheckedChildren="必填" />
+                </Form.Item>
                 <Form.Item>
                   <Button type="primary" icon={<PlusOutlined />} onClick={handleAddProperty}>添加</Button>
                 </Form.Item>
@@ -406,7 +428,7 @@ export default function EntityList() {
                     {
                       title: '', width: 50,
                       render: (_: unknown, record: ActionItem) => (
-                        <Popconfirm title="删除此操作?" onConfirm={() => handleDeleteAction(record.id)}>
+                        <Popconfirm title="删除此操作?" okText="确认" cancelText="取消" onConfirm={() => handleDeleteAction(record.id)}>
                           <Button size="small" danger icon={<DeleteOutlined />} />
                         </Popconfirm>
                       ),
@@ -449,6 +471,7 @@ export default function EntityList() {
         onCancel={() => { setPropEditOpen(false); setEditingProp(null); }}
         width={680}
         destroyOnClose
+        okText="确认" cancelText="取消"
       >
         <Form form={propEditForm} layout="vertical" style={{ marginTop: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>

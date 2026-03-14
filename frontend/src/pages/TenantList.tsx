@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, Input, message, Space, Tag, Popconfirm } from 'antd';
+import { Table, Button, Modal, Form, Input, Switch, message, Space, Tag, Popconfirm } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { getTenants, createTenant, updateTenant, deleteTenant } from '../api/admin';
 
@@ -33,11 +33,13 @@ export default function TenantList() {
 
   const handleSubmit = async () => {
     const values = await form.validateFields();
+    const { _status_switch, ...rest } = values;
+    rest.status = _status_switch ? 'active' : 'inactive';
     if (editingId) {
-      await updateTenant(editingId, values);
+      await updateTenant(editingId, rest);
       message.success('更新成功');
     } else {
-      await createTenant(values);
+      await createTenant(rest);
       message.success('创建成功');
     }
     setModalOpen(false);
@@ -48,7 +50,7 @@ export default function TenantList() {
 
   const handleEdit = (record: Tenant) => {
     setEditingId(record.id);
-    form.setFieldsValue(record);
+    form.setFieldsValue({ ...record, _status_switch: record.status === 'active' });
     setModalOpen(true);
   };
 
@@ -71,13 +73,24 @@ export default function TenantList() {
         { title: '名称', dataIndex: 'name' },
         { title: '编码', dataIndex: 'code' },
         { title: '描述', dataIndex: 'description' },
-        { title: '状态', dataIndex: 'status', render: (s: string) => <Tag color={s === 'active' ? 'green' : 'default'}>{s}</Tag> },
+        {
+          title: '状态', dataIndex: 'status',
+          render: (s: string, record: Tenant) => (
+            <Switch checked={s === 'active'} checkedChildren="启用" unCheckedChildren="停用"
+              onChange={async (checked) => {
+                await updateTenant(record.id, { status: checked ? 'active' : 'inactive' });
+                message.success(checked ? '已启用' : '已停用');
+                load();
+              }}
+            />
+          ),
+        },
         { title: '创建时间', dataIndex: 'created_at' },
         {
           title: '操作', render: (_: unknown, record: Tenant) => (
             <Space>
               <Button size="small" onClick={() => handleEdit(record)}>编辑</Button>
-              <Popconfirm title="确认删除?" onConfirm={() => handleDelete(record.id)}>
+              <Popconfirm title="确认删除?" okText="确认" cancelText="取消" onConfirm={() => handleDelete(record.id)}>
                 <Button size="small" danger>删除</Button>
               </Popconfirm>
             </Space>
@@ -85,7 +98,8 @@ export default function TenantList() {
         },
       ]} />
 
-      <Modal title={editingId ? '编辑租户' : '新建租户'} open={modalOpen} onOk={handleSubmit} onCancel={() => setModalOpen(false)}>
+      <Modal title={editingId ? '编辑租户' : '新建租户'} open={modalOpen} onOk={handleSubmit} onCancel={() => setModalOpen(false)}
+        okText="确认" cancelText="取消">
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="名称" rules={[{ required: true }]}>
             <Input />
@@ -95,6 +109,9 @@ export default function TenantList() {
           </Form.Item>
           <Form.Item name="description" label="描述">
             <Input.TextArea />
+          </Form.Item>
+          <Form.Item name="_status_switch" label="状态" valuePropName="checked" initialValue={true}>
+            <Switch checkedChildren="启用" unCheckedChildren="停用" />
           </Form.Item>
         </Form>
       </Modal>
