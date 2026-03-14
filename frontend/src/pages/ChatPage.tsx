@@ -639,29 +639,37 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
                                   const items = d?.data?.items || d?.items || (Array.isArray(d) ? d : [d]);
                                   return (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                      {items.map((person: any, pi: number) => (
-                                        <div key={pi} style={{
-                                          display: 'flex', alignItems: 'center', gap: 10, padding: 8,
-                                          background: person.is_leader ? 'linear-gradient(135deg, rgba(139,92,246,0.1), rgba(59,130,246,0.1))' : '#F5F7FA',
-                                          border: person.is_leader ? '1px solid rgba(139,92,246,0.2)' : 'none',
-                                          borderRadius: 8,
-                                        }}>
-                                          <div style={{
-                                            width: 36, height: 36, borderRadius: '50%',
-                                            background: 'linear-gradient(135deg, #8B5CF6, #3B82F6)',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            color: '#fff', fontSize: 14, fontWeight: 600,
-                                          }}>{(person.name || '?').slice(0, 1)}</div>
-                                          <div style={{ flex: 1 }}>
-                                            <div style={{ fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                              {person.name}
-                                              {person.is_leader && <span style={{ padding: '2px 6px', background: '#8B5CF6', color: '#fff', borderRadius: 4, fontSize: 10 }}>负责人</span>}
+                                      <div style={{ fontSize: 13, fontWeight: 600, color: '#1A1A1A', marginBottom: 2 }}>
+                                        👥 现场人员 ({items.length}人)
+                                      </div>
+                                      {items.map((person: any, pi: number) => {
+                                        const pName = person.staff_name || person.name || '未知';
+                                        const pRole = person.role || person.department || person.dept || '';
+                                        const isLeader = person.is_leader || (pRole && (pRole.includes('负责') || pRole.includes('经理') || pRole.includes('主管')));
+                                        return (
+                                          <div key={pi} style={{
+                                            display: 'flex', alignItems: 'center', gap: 10, padding: 8,
+                                            background: isLeader ? 'linear-gradient(135deg, rgba(139,92,246,0.1), rgba(59,130,246,0.1))' : '#F5F7FA',
+                                            border: isLeader ? '1px solid rgba(139,92,246,0.2)' : 'none',
+                                            borderRadius: 8,
+                                          }}>
+                                            <div style={{
+                                              width: 36, height: 36, borderRadius: '50%',
+                                              background: 'linear-gradient(135deg, #8B5CF6, #3B82F6)',
+                                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                              color: '#fff', fontSize: 14, fontWeight: 600,
+                                            }}>{pName.slice(0, 1)}</div>
+                                            <div style={{ flex: 1 }}>
+                                              <div style={{ fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                {pName}
+                                                {isLeader && <span style={{ padding: '2px 6px', background: '#8B5CF6', color: '#fff', borderRadius: 4, fontSize: 10 }}>负责人</span>}
+                                              </div>
+                                              {pRole && <div style={{ fontSize: 11, color: '#999' }}>{pRole}</div>}
                                             </div>
-                                            <div style={{ fontSize: 11, color: '#999' }}>{person.department || person.dept || ''}</div>
+                                            {person.phone && <div style={{ fontSize: 12, color: '#3B82F6' }}>📞 {person.phone}</div>}
                                           </div>
-                                          {person.phone && <div style={{ fontSize: 12, color: '#3B82F6' }}>📞 {person.phone}</div>}
-                                        </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   );
                                 })()}
@@ -710,80 +718,126 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
           </div>
         </div>
 
-        <div style={{
-          padding: isMobile ? '8px 12px' : '12px 24px',
-          paddingBottom: isMobile ? 'calc(8px + env(safe-area-inset-bottom, 0px))' : 12,
-          background: '#fff',
-          borderTop: '1px solid #E5E7EB',
-        }}>
-          {/* 快捷入口 */}
-          <div style={{ maxWidth: 768, margin: '0 auto 8px', display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
-            {[
-              { icon: '📊', text: '查进度' },
-              { icon: '👥', text: '查人员' },
-              { icon: '📋', text: '查服务' },
-              { icon: '📝', text: '提投诉' },
-              { icon: '📞', text: '联系人' },
-            ].map((s) => (
-              <span
-                key={s.text}
-                onClick={() => handleQuickSend(`${s.icon} ${s.text}`)}
-                style={{
-                  padding: '4px 12px', borderRadius: 100, fontSize: 12, cursor: 'pointer',
-                  background: '#F5F7FA', color: '#666', transition: 'all 0.2s',
-                  border: '1px solid transparent',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#8B5CF6'; e.currentTarget.style.color = '#8B5CF6'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.color = '#666'; }}
-              >{s.icon} {s.text}</span>
-            ))}
-          </div>
-          <div style={{
-            maxWidth: 768, margin: '0 auto',
-            background: '#F5F7FA', borderRadius: 24,
-            display: 'flex', alignItems: 'flex-end',
-            padding: '4px 4px 4px 16px',
-            border: '2px solid transparent',
-            transition: 'border-color 0.2s',
-          }}>
-            <Input.TextArea
-              ref={inputRef}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={'\u7ed9 \u6cb3\u72f8\u4e91AI \u53d1\u6d88\u606f\u2026'}
-              autoSize={{ minRows: 1, maxRows: 6 }}
-              variant="borderless"
-              style={{ flex: 1, resize: 'none', fontSize: 14 }}
-              disabled={sending}
-            />
-            <Space size={4}>
-              {!hasInput && (
-                <Tooltip title={listening ? '\u505c\u6b62\u542c\u5199' : '\u8bed\u97f3\u8f93\u5165'}>
-                  <Button
-                    type="text"
-                    shape="circle"
-                    icon={listening ? <AudioMutedOutlined style={{ color: '#f5222d' }} /> : <AudioOutlined />}
-                    onClick={toggleDictation}
-                    disabled={sending}
-                  />
-                </Tooltip>
-              )}
-              <Button
-                type="primary"
-                shape="circle"
-                icon={<SendOutlined />}
+        <div className="chat-input-area">
+          <div style={{ maxWidth: 768, margin: '0 auto' }}>
+            <div className="chat-input-wrapper">
+              <div className="chat-input-box">
+                <Input.TextArea
+                  ref={inputRef}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={'给 河狸云AI 发消息…'}
+                  autoSize={{ minRows: 1, maxRows: 6 }}
+                  variant="borderless"
+                  style={{ flex: 1, resize: 'none', fontSize: 14 }}
+                  disabled={sending}
+                />
+                {!hasInput && (
+                  <Tooltip title={listening ? '停止听写' : '语音输入'}>
+                    <Button
+                      type="text"
+                      shape="circle"
+                      size="small"
+                      icon={listening ? <AudioMutedOutlined style={{ color: '#f5222d' }} /> : <AudioOutlined />}
+                      onClick={toggleDictation}
+                      disabled={sending}
+                    />
+                  </Tooltip>
+                )}
+              </div>
+              <button
+                className="chat-send-btn"
                 onClick={handleSend}
-                loading={sending}
-                disabled={!hasInput}
-                style={{ background: hasInput ? 'linear-gradient(135deg, #8B5CF6, #3B82F6)' : undefined }}
-              />
-            </Space>
+                disabled={!hasInput || sending}
+              >
+                {sending ? <LoadingOutlined style={{ fontSize: 18, color: '#fff' }} /> : <SendOutlined style={{ fontSize: 18, color: '#fff' }} />}
+              </button>
+            </div>
+            <div className="chat-shortcuts">
+              {[
+                { icon: '📊', text: '查进度', query: '查看我的产线进度' },
+                { icon: '👥', text: '查人员', query: '现场有几个人在施工' },
+                { icon: '📋', text: '查服务', query: '查看服务记录' },
+                { icon: '📝', text: '提投诉', query: '我要反馈一个问题' },
+                { icon: '📞', text: '联系人', query: '联系负责人' },
+              ].map((s) => (
+                <span
+                  key={s.text}
+                  className="chat-shortcut"
+                  onClick={() => handleQuickSend(s.query)}
+                >{s.icon} {s.text}</span>
+              ))}
+            </div>
           </div>
         </div>
       </Content>
 
       <style>{`
+        /* ===== 输入区域 ===== */
+        .chat-input-area {
+          padding: 16px 20px;
+          background: white;
+          border-top: 1px solid #E5E7EB;
+        }
+        .chat-input-wrapper {
+          display: flex;
+          gap: 12px;
+          align-items: flex-end;
+        }
+        .chat-input-box {
+          flex: 1;
+          display: flex;
+          align-items: center;
+          background: #F5F7FA;
+          border-radius: 24px;
+          padding: 4px 4px 4px 16px;
+          border: 2px solid transparent;
+          transition: all 0.2s ease;
+        }
+        .chat-input-box:focus-within {
+          border-color: #8B5CF6;
+          background: white;
+        }
+        .chat-send-btn {
+          width: 44px;
+          height: 44px;
+          background: linear-gradient(135deg, #8B5CF6, #3B82F6);
+          border: none;
+          border-radius: 50%;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: white;
+          font-size: 18px;
+          transition: all 0.2s ease;
+          flex-shrink: 0;
+        }
+        .chat-send-btn:hover { transform: scale(1.05); }
+        .chat-send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .chat-shortcuts {
+          display: flex;
+          gap: 8px;
+          margin-top: 12px;
+          flex-wrap: wrap;
+        }
+        .chat-shortcut {
+          padding: 6px 12px;
+          background: white;
+          border: 1px dashed #E5E7EB;
+          border-radius: 16px;
+          font-size: 12px;
+          color: #666;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .chat-shortcut:hover {
+          border-style: solid;
+          border-color: #8B5CF6;
+          color: #8B5CF6;
+        }
+        /* ===== 光标闪烁 ===== */
         .cursor-blink {
           animation: blink 1s step-end infinite;
           font-weight: 100;

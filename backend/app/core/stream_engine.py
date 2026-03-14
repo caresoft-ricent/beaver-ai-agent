@@ -766,6 +766,16 @@ _SKILL_QUICK_ACTIONS = {
     "QUERY_STAFF": [
         {"icon": "📞", "text": "联系负责人", "action": "联系负责人", "primary": True},
     ],
+    "CONTACT_PERSON": [
+        {"icon": "📞", "text": "拨打电话", "action": "拨打电话", "primary": True},
+    ],
+    "QUERY_SERVICE": [
+        {"icon": "📝", "text": "提交投诉", "action": "我要反馈一个问题"},
+        {"icon": "👤", "text": "联系工程师", "action": "联系负责人"},
+    ],
+    "SUBMIT_COMPLAINT": [
+        {"icon": "📋", "text": "查看投诉进度", "action": "查看投诉进度"},
+    ],
 }
 
 
