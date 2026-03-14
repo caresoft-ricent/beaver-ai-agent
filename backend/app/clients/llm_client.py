@@ -16,7 +16,7 @@ def call_llm(
 ) -> dict:
     """
     统一调用各家大模型API
-    支持: doubao(豆包), glm(智谱), qwen(千问), openai_compatible(兼容OpenAI格式的)
+    支持: doubao(豆包), glm(智谱), qwen(千问), minimax, lmstudio(本地), 及其他OpenAI兼容格式
     """
     if system_prompt:
         messages = [{"role": "system", "content": system_prompt}] + messages

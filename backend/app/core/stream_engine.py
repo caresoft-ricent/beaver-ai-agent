@@ -78,8 +78,18 @@ async def stream_dialog(
         .all()
     )
 
-    # 无工具链 → 直接返回模板
+    # 无工具链 → 用LLM生成回答或返回模板
     if not tools:
+        # 有 response_prompt → 走LLM流式生成
+        if matched_skill.response_prompt:
+            llm_config = _get_llm_config(db, tenant_id, "response") or _get_llm_config(db, tenant_id, "general")
+            if llm_config:
+                yield agui.step_started("reply_generation")
+                async for evt in _stream_llm_reply(llm_config, message, matched_skill, {}):
+                    yield evt
+                yield agui.step_finished("reply_generation")
+                yield agui.run_finished(thread_id, run_id)
+                return
         reply = matched_skill.response_template or "您好！请问有什么可以帮助您的？"
         async for evt in _stream_text(reply):
             yield evt

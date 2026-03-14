@@ -223,7 +223,8 @@ def seed():
                 skill_description="当用户询问产线进度、交付进度、生产状态时触发",
                 match_keywords=["进度", "产线", "交货", "交付", "生产", "完工", "什么时候"],
                 match_patterns=[r"(?P<line_code>\d{2}[A-Z]\d{4}-[A-Z])"],
-                response_template=None,  # 用Mock数据直接返回结构化数据
+                response_template=None,
+                response_prompt="你是河狸云AI助手。请根据查询到的产线进度数据，用简洁友好的中文为客户汇总产线状态。重点说明进度百分比、当前节点和预计交付日期。",
                 sort_order=1,
                 status="published",
                 version=1,
@@ -290,6 +291,7 @@ def seed():
                 skill_description="无法匹配到其他意图时的兜底回答",
                 match_keywords=["你好", "在吗", "谢谢"],
                 response_template="您好！我是河狸云AI助手，可以帮您查询产线进度、现场人员信息等。请问有什么可以帮助您的？",
+                response_prompt="你是河狸云AI助手，专门为制造业客户提供服务。你可以帮助查询产线进度、现场人员信息等。请用友好、专业的中文回答用户的问题。如果问题超出你的能力范围，请友好地引导用户使用你支持的功能。",
                 sort_order=99,
                 status="published",
                 version=1,
@@ -298,12 +300,72 @@ def seed():
             db.flush()
             print(f"✓ 闲聊技能创建成功 id={skill_chat.id}")
 
+        # ===== 9. 大模型配置 =====
+        llm_configs = [
+            {
+                "name": "MiniMax-意图识别",
+                "provider": "minimax",
+                "model_name": "MiniMax-Text-01",
+                "api_url": "https://api.minimax.chat/v1",
+                "api_key": "sk-cp-1ZLXYLx0Bv1dDqjcsi12IGSt-jeryvFSY5juxpFS0s8M4hnuL-bLbcy6QUdnHMXTuXmGnIHg6B9DxfvfNKXTxw1lUpM7Gx2aBN400lTZsR-3x38IB1FONF4",
+                "temperature": 0.3,
+                "max_tokens": 256,
+                "usage": "intent",
+            },
+            {
+                "name": "MiniMax-回答生成",
+                "provider": "minimax",
+                "model_name": "MiniMax-Text-01",
+                "api_url": "https://api.minimax.chat/v1",
+                "api_key": "sk-cp-1ZLXYLx0Bv1dDqjcsi12IGSt-jeryvFSY5juxpFS0s8M4hnuL-bLbcy6QUdnHMXTuXmGnIHg6B9DxfvfNKXTxw1lUpM7Gx2aBN400lTZsR-3x38IB1FONF4",
+                "temperature": 0.7,
+                "max_tokens": 2048,
+                "usage": "response",
+            },
+            {
+                "name": "LMStudio-Qwen3-Coder(本地)",
+                "provider": "lmstudio",
+                "model_name": "qwen/qwen3-coder-next",
+                "api_url": "http://127.0.0.1:1234/v1",
+                "api_key": "sk-lm-39A3fdZ0:egjnzDsTeFfrG5t03ppz",
+                "temperature": 0.3,
+                "max_tokens": 512,
+                "usage": "intent",
+                "status": "disabled",
+            },
+            {
+                "name": "LMStudio-Qwen3.5-122B(本地)",
+                "provider": "lmstudio",
+                "model_name": "qwen3.5-122b-a10b",
+                "api_url": "http://127.0.0.1:1234/v1",
+                "api_key": "sk-lm-39A3fdZ0:egjnzDsTeFfrG5t03ppz",
+                "temperature": 0.7,
+                "max_tokens": 2048,
+                "usage": "general",
+                "status": "disabled",
+            },
+        ]
+
+        for cfg in llm_configs:
+            existing_llm = db.query(LLMConfig).filter(
+                LLMConfig.tenant_id == TENANT_ID,
+                LLMConfig.name == cfg["name"],
+            ).first()
+            if existing_llm:
+                print(f"LLM配置 '{cfg['name']}' 已存在 (id={existing_llm.id})，跳过...")
+                continue
+            llm = LLMConfig(tenant_id=TENANT_ID, **cfg)
+            db.add(llm)
+            db.flush()
+            print(f"✓ LLM配置创建成功: {cfg['name']} (id={llm.id})")
+
         db.commit()
         print("\n✅ 演示数据插入完成！")
         print(f"   租户: 东威科技 (id={TENANT_ID})")
         print(f"   连接器: id={connector_id} (Mock模式)")
         print(f"   本体: 产线(id={entity_pl_id}), 现场人员(id={entity_fs_id})")
         print(f"   技能: QUERY_PROGRESS, QUERY_STAFF, CHITCHAT")
+        print(f"   大模型: MiniMax(意图+回答), LMStudio-Qwen3-Coder, LMStudio-Qwen3.5-122B")
 
     except Exception as e:
         db.rollback()

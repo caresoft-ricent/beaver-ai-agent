@@ -104,11 +104,13 @@ export default function LLMConfigList() {
               { value: 'doubao', label: '豆包(字节)' },
               { value: 'glm', label: '智谱GLM' },
               { value: 'qwen', label: '通义千问' },
-              { value: 'custom', label: '自定义' },
+              { value: 'minimax', label: 'MiniMax' },
+              { value: 'lmstudio', label: 'LM Studio(本地)' },
+              { value: 'custom', label: '自定义兼容' },
             ]} />
           </Form.Item>
           <Form.Item name="model_name" label="模型名称" rules={[{ required: true }]}>
-            <Input placeholder="如 doubao-pro-32k" />
+            <Input placeholder="如 MiniMax-Text-01, qwen3.5-122b-a10b" />
           </Form.Item>
           <Form.Item name="api_url" label="API地址" rules={[{ required: true }]}>
             <Input placeholder="https://ark.cn-beijing.volces.com/api/v3" />

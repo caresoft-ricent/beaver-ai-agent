@@ -12,7 +12,7 @@ class LLMConfig(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     tenant_id = Column(BigInteger, nullable=False, index=True, comment="租户ID")
     name = Column(String(128), nullable=False, comment="配置名称")
-    provider = Column(String(32), nullable=False, comment="提供商: doubao/glm/qwen/custom")
+    provider = Column(String(32), nullable=False, comment="提供商: doubao/glm/qwen/minimax/lmstudio/custom")
     model_name = Column(String(64), nullable=False, comment="模型名称")
     api_url = Column(String(512), nullable=False, comment="API地址")
     api_key = Column(String(512), nullable=False, comment="API密钥(加密存储)")

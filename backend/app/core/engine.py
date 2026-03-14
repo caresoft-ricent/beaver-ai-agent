@@ -68,8 +68,15 @@ class DialogEngine:
             .all()
         )
 
-        # 无工具链的技能（如闲聊）直接返回模板
+        # 无工具链的技能 → 有response_prompt时走LLM，否则返回模板
         if not tools:
+            if matched_skill.response_prompt:
+                llm_config = self._get_llm_config("response") or self._get_llm_config("general")
+                if llm_config:
+                    llm_reply = self._generate_reply_with_llm(message, matched_skill, {})
+                    if llm_reply:
+                        result.reply = llm_reply
+                        return result
             result.reply = matched_skill.response_template or "您好！请问有什么可以帮助您的？"
             return result
 
