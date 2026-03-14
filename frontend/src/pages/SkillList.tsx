@@ -24,7 +24,12 @@ interface Skill {
   match_keywords?: string[];
   match_patterns?: string[];
   response_template?: string;
+  response_prompt?: string;
   intent_prompt?: string;
+  entity_extract_prompt?: string;
+  max_response_tokens?: number;
+  max_tool_calls?: number;
+  summary_threshold?: number;
   llm_config_id?: number;
   sort_order: number;
   status: string;
@@ -301,6 +306,28 @@ export default function SkillList() {
           <Form.Item name="intent_prompt" label="意图识别提示词 (LLM)" tooltip="关联大模型后，用此提示词做意图识别">
             <Input.TextArea rows={2} placeholder="可选：当关键词无法匹配时，由大模型判断是否命中此技能" />
           </Form.Item>
+
+          <Form.Item name="entity_extract_prompt" label="实体抽取提示词" tooltip="自定义LLM实体抽取提示词，支持{intent_code},{entities_desc},{known_str},{context_str}变量">
+            <Input.TextArea rows={2} placeholder="可选：自定义实体抽取提示词模板" />
+          </Form.Item>
+
+          <Form.Item name="response_prompt" label="回答生成提示词" tooltip="LLM生成回答时使用的系统提示词">
+            <Input.TextArea rows={2} placeholder="可选：请根据以下数据，用友好的中文回答用户的问题。" />
+          </Form.Item>
+
+          <Divider orientation="left" plain>LLM 约束</Divider>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+            <Form.Item name="max_response_tokens" label="最大回复Token" tooltip="0表示使用默认值(512)">
+              <InputNumber min={0} max={8192} placeholder="0=默认" style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="max_tool_calls" label="最大工具调用次数" tooltip="单轮对话中最多调用的工具数">
+              <InputNumber min={1} max={50} placeholder="默认10" style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="summary_threshold" label="摘要触发轮次" tooltip="超过此轮次数后自动触发上下文摘要">
+              <InputNumber min={5} max={100} placeholder="默认20" style={{ width: '100%' }} />
+            </Form.Item>
+          </div>
 
           <Form.Item name="llm_config_id" label="关联大模型">
             <InputNumber placeholder="填写大模型配置ID（可选）" style={{ width: '100%' }} />

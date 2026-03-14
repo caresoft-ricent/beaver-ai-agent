@@ -48,6 +48,23 @@ class EntityPropertyCreate(BaseModel):
     is_required: bool = False
     property_description: Optional[str] = None
     required_description: Optional[str] = None
+    llm_description: Optional[str] = None
+    extract_expression: Optional[str] = None
+    normalization_config: Optional[dict] = None
+    mapping_config: Optional[dict] = None
+
+
+class EntityPropertyUpdate(BaseModel):
+    title: Optional[str] = None
+    is_input: Optional[bool] = None
+    is_output: Optional[bool] = None
+    is_required: Optional[bool] = None
+    property_description: Optional[str] = None
+    required_description: Optional[str] = None
+    llm_description: Optional[str] = None
+    extract_expression: Optional[str] = None
+    normalization_config: Optional[dict] = None
+    mapping_config: Optional[dict] = None
 
 
 class EntityPropertyOut(BaseModel):
@@ -61,6 +78,10 @@ class EntityPropertyOut(BaseModel):
     is_output: bool
     is_required: bool
     property_description: Optional[str]
+    llm_description: Optional[str] = None
+    extract_expression: Optional[str] = None
+    normalization_config: Optional[dict] = None
+    mapping_config: Optional[dict] = None
 
     model_config = {"from_attributes": True}
 

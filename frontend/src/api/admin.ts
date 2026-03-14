@@ -124,6 +124,9 @@ export const createEntityProperty = (entityId: number, data: Record<string, unkn
 export const deleteEntityProperty = (propertyId: number) =>
   client.delete(`/admin/ontologies/properties/${propertyId}`);
 
+export const updateEntityProperty = (propertyId: number, data: Record<string, unknown>) =>
+  client.put(`/admin/ontologies/properties/${propertyId}`, data);
+
 // Normalization Rules
 export const getNormalizationRules = (params?: { category?: string; domain?: string; tenant_id?: number; is_active?: boolean; page?: number; size?: number }) =>
   client.get('/admin/normalization', { params });

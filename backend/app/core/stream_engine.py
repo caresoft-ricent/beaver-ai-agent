@@ -16,7 +16,7 @@ from typing import AsyncGenerator, Optional
 from sqlalchemy.orm import Session
 
 from app.models.config import LLMConfig, Connector
-from app.models.ontology import Entity
+from app.models.ontology import Entity, EntityProperty
 from app.models.action import Action
 from app.models.intent import Skill, SkillTool
 from app.models.action import ActionParameter
@@ -26,6 +26,7 @@ from app.core import agui
 from app.core.context_manager import (
     load_context, save_context, merge_entities,
     normalize_entities, convert_params, check_slots, build_clarification_reply,
+    should_summarize, summarize_context,
 )
 from app.core.evidence import EvidenceCollector
 
@@ -85,10 +86,28 @@ async def _stream_dialog_inner(
     t0 = time.time()
     ctx = load_context(db, session_id)
     ctx["turn_count"] = ctx.get("turn_count", 0) + 1
+
+    # 上下文摘要检查 (阈值默认20，匹配到技能后可用技能配置覆盖)
+    if should_summarize(ctx):
+        llm_cfg = _get_llm_config(db, tenant_id, "general")
+        if llm_cfg:
+            def _call_summary(messages, system_prompt):
+                r = call_llm(
+                    provider=llm_cfg.provider, model=llm_cfg.model_name,
+                    api_url=llm_cfg.api_url, api_key=llm_cfg.api_key,
+                    messages=messages, system_prompt=system_prompt,
+                    temperature=0.3, max_tokens=256,
+                )
+                return r["content"]
+            summarize_context(db, session_id, ctx, llm_caller=_call_summary)
+        else:
+            summarize_context(db, session_id, ctx)
+
     evidence.add_step("load_context", {
         "turn": ctx["turn_count"],
         "existing_entities": ctx.get("entities", {}),
         "last_intent": ctx.get("last_intent"),
+        "has_summary": bool(ctx.get("summary")),
     }, int((time.time() - t0) * 1000))
 
     # -- Step 2: 加载技能 --
@@ -219,13 +238,31 @@ async def _stream_dialog_inner(
             return
     else:
         evidence.add_step("slot_check", {"complete": True})
+        # 需要确认的技能（如投诉提交）：槽位齐全时发送确认卡片
+        if matched_skill.clarification_config and matched_skill.clarification_config.get("require_confirm"):
+            if not ctx.get("confirmed"):
+                yield agui.custom_event("card", {
+                    "card_type": "confirm",
+                    "title": matched_skill.clarification_config.get("confirm_title", "信息确认"),
+                    "fields": _build_confirm_fields(db, matched_skill, entities),
+                    "skill_code": matched_skill.skill_code,
+                })
+                confirm_text = matched_skill.clarification_config.get("confirm_message", "请确认以上信息是否正确：")
+                async for evt in _stream_text(confirm_text):
+                    yield evt
+                save_context(db, session_id, ctx)
+                return
 
     # -- Step 7: 执行工具链 --
     yield agui.step_started("tool_execution")
     t0 = time.time()
 
     query_results = {}
-    for tool in tools:
+    max_calls = getattr(matched_skill, 'max_tool_calls', 10) or 10
+    for idx, tool in enumerate(tools):
+        if idx >= max_calls:
+            evidence.add_step("tool_limit", {"max_tool_calls": max_calls, "skipped": len(tools) - idx})
+            break
         tool_result = _execute_tool_with_events(db, tool, entities, customer_id, evidence)
         for evt in tool_result["events"]:
             yield evt
@@ -263,6 +300,18 @@ async def _stream_dialog_inner(
 
     if query_results:
         yield agui.custom_event("structured_data", query_results)
+        # 根据技能类型发送对应的卡片事件
+        card_evt = _build_card_event(matched_skill, query_results, entities)
+        if card_evt:
+            yield agui.custom_event("card", card_evt)
+
+    # 快捷操作
+    quick_actions = _build_quick_actions(matched_skill)
+    if quick_actions:
+        yield agui.custom_event("card", {
+            "card_type": "quick_actions",
+            "actions": quick_actions,
+        })
 
     yield agui.custom_event("evidence", evidence.to_dict())
 
@@ -321,6 +370,10 @@ def _recognize_intent(db: Session, tenant_id: int, message: str,
             {"code": s.skill_code, "description": s.skill_description or s.skill_name}
             for s in skills
         ]
+        # 合并上下文摘要
+        llm_context = ctx.get("entities") if ctx else None
+        if ctx and ctx.get("summary"):
+            llm_context = {**(llm_context or {}), "_summary": ctx["summary"]}
         try:
             llm_result = call_llm_for_intent(
                 provider=llm_config.provider,
@@ -329,7 +382,7 @@ def _recognize_intent(db: Session, tenant_id: int, message: str,
                 api_key=llm_config.api_key,
                 user_message=message,
                 available_intents=available_intents,
-                context=ctx.get("entities") if ctx else None,
+                context=llm_context,
             )
             intent_code = llm_result.get("intent")
             confidence = llm_result.get("confidence", 0)
@@ -357,6 +410,11 @@ def _enhanced_entity_extraction(
     if not entity_defs:
         return {}
 
+    # 合并上下文摘要
+    llm_context = ctx.get("entities")
+    if ctx.get("summary"):
+        llm_context = {**(llm_context or {}), "_summary": ctx["summary"]}
+
     try:
         result = call_llm_for_entities(
             provider=llm_config.provider,
@@ -367,7 +425,8 @@ def _enhanced_entity_extraction(
             intent_code=skill.skill_code,
             known_entities=known_entities,
             entity_definitions=entity_defs,
-            context=ctx.get("entities"),
+            context=llm_context,
+            custom_prompt=skill.entity_extract_prompt or None,
         )
         return result.get("entities", {})
     except Exception:
@@ -383,6 +442,18 @@ def _get_entity_definitions(db: Session, skill: Skill) -> list:
         .order_by(SkillTool.order_no)
         .all()
     )
+    # 预加载所有相关 EntityProperty，用于补充 llm_description / extract_expression
+    entity_ids = {t.entity_id for t in tools if t.entity_id}
+    ep_map: dict[tuple, EntityProperty] = {}  # (entity_id, name) -> EntityProperty
+    if entity_ids:
+        eps = (
+            db.query(EntityProperty)
+            .filter(EntityProperty.entity_id.in_(entity_ids), EntityProperty.is_input == True)
+            .all()
+        )
+        for ep in eps:
+            ep_map[(ep.entity_id, ep.name)] = ep
+
     seen = set()
     for tool in tools:
         api_config = tool.config.get("api_config") if tool.config else None
@@ -392,12 +463,16 @@ def _get_entity_definitions(db: Session, skill: Skill) -> list:
                     pname = p if isinstance(p, str) else p.get("name", "")
                     if pname and pname not in seen:
                         seen.add(pname)
+                        # 尝试从 EntityProperty 获取增强信息
+                        ep = ep_map.get((tool.entity_id, pname)) if tool.entity_id else None
                         defs.append({
                             "name": pname,
                             "title": pname if isinstance(p, str) else p.get("title", pname),
                             "type": "string" if isinstance(p, str) else p.get("type", "string"),
                             "required": p_list_key == "required_params",
                             "description": "" if isinstance(p, str) else p.get("description", ""),
+                            "llm_description": ep.llm_description if ep and ep.llm_description else "",
+                            "extract_expression": ep.extract_expression if ep and ep.extract_expression else "",
                         })
             continue
 
@@ -410,12 +485,15 @@ def _get_entity_definitions(db: Session, skill: Skill) -> list:
             for ap in action_params:
                 if ap.name not in seen:
                     seen.add(ap.name)
+                    ep = ep_map.get((tool.entity_id, ap.name)) if tool.entity_id else None
                     defs.append({
                         "name": ap.name,
                         "title": ap.title or ap.name,
                         "type": ap.type,
                         "required": ap.is_required,
                         "description": ap.param_description or "",
+                        "llm_description": ep.llm_description if ep and ep.llm_description else "",
+                        "extract_expression": ep.extract_expression if ep and ep.extract_expression else "",
                     })
     return defs
 
@@ -569,6 +647,10 @@ async def _stream_llm_reply(
         "Content-Type": "application/json",
         "Authorization": f"Bearer {llm_config.api_key}",
     }
+    max_tokens = 512
+    if hasattr(skill, 'max_response_tokens') and skill.max_response_tokens and skill.max_response_tokens > 0:
+        max_tokens = skill.max_response_tokens
+
     payload = {
         "model": llm_config.model_name,
         "messages": [
@@ -576,7 +658,7 @@ async def _stream_llm_reply(
             {"role": "user", "content": f"用户问题：{message}\n\n数据：{data_str}"},
         ],
         "temperature": 0.7,
-        "max_tokens": 512,
+        "max_tokens": max_tokens,
         "stream": True,
     }
 
@@ -659,3 +741,76 @@ def _get_llm_config(db: Session, tenant_id: int, usage: str) -> Optional[LLMConf
             .first()
         )
     return config
+
+
+# ── 卡片事件构建 ──
+
+# 技能编码 → 卡片类型映射
+_SKILL_CARD_MAP = {
+    "QUERY_COMPLAINT": "complaint",
+    "SUBMIT_COMPLAINT": "complaint",
+    "QUERY_STAFF": "staff",
+    "CONTACT_PERSON": "staff",
+}
+
+# 技能编码 → 快捷操作
+_SKILL_QUICK_ACTIONS = {
+    "QUERY_PROGRESS": [
+        {"icon": "📋", "text": "查看详细节点", "action": "查看详细节点"},
+        {"icon": "👤", "text": "联系负责人", "action": "联系负责人"},
+    ],
+    "QUERY_COMPLAINT": [
+        {"icon": "📄", "text": "查看服务报告", "action": "查看服务报告"},
+        {"icon": "💬", "text": "继续反馈", "action": "继续反馈"},
+    ],
+    "QUERY_STAFF": [
+        {"icon": "📞", "text": "联系负责人", "action": "联系负责人", "primary": True},
+    ],
+}
+
+
+def _build_card_event(skill: Skill, query_results: dict, entities: dict) -> Optional[dict]:
+    """根据技能类型和查询结果构建卡片事件数据"""
+    card_type = _SKILL_CARD_MAP.get(skill.skill_code)
+    if not card_type:
+        return None
+
+    # 提取第一个工具的结果数据
+    first_result = None
+    for _key, val in query_results.items():
+        if isinstance(val, dict):
+            first_result = val.get("data", val)
+            break
+
+    if card_type == "complaint":
+        return {
+            "card_type": "complaint",
+            "data": first_result,
+            "entities": entities,
+        }
+    elif card_type == "staff":
+        return {
+            "card_type": "staff",
+            "data": first_result,
+            "entities": entities,
+        }
+    return None
+
+
+def _build_quick_actions(skill: Skill) -> list:
+    """获取技能对应的快捷操作列表"""
+    return _SKILL_QUICK_ACTIONS.get(skill.skill_code, [])
+
+
+def _build_confirm_fields(db: Session, skill: Skill, entities: dict) -> list:
+    """构建确认卡片的字段列表"""
+    fields = []
+    entity_defs = _get_entity_definitions(db, skill)
+    for d in entity_defs:
+        name = d["name"]
+        if name in entities:
+            fields.append({
+                "label": d.get("title") or name,
+                "value": str(entities[name]),
+            })
+    return fields

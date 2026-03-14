@@ -40,7 +40,14 @@ interface ChatMessage {
   toolName?: string;
   created_at?: string;
   streaming?: boolean;
+  cards?: CardData[];
 }
+
+type CardData =
+  | { card_type: 'confirm'; title: string; fields: { label: string; value: string }[]; skill_code: string }
+  | { card_type: 'complaint'; data: any; entities: any }
+  | { card_type: 'staff'; data: any; entities: any }
+  | { card_type: 'quick_actions'; actions: { icon: string; text: string; action: string; primary?: boolean }[] };
 
 interface Session {
   session_id: string;
@@ -235,6 +242,11 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
         if (evt.name === 'intent') {
           setMessages(prev => prev.map(m =>
             m.id === assistantId ? { ...m, intent: evt.value?.code } : m
+          ));
+        }
+        if (evt.name === 'card') {
+          setMessages(prev => prev.map(m =>
+            m.id === assistantId ? { ...m, cards: [...(m.cards || []), evt.value as CardData] } : m
           ));
         }
         break;
@@ -557,6 +569,119 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
                             </div>
                           )}
                         </div>
+                        {/* 卡片渲染 */}
+                        {msg.cards?.map((card, ci) => (
+                          <div key={ci} style={{ marginTop: 8 }}>
+                            {card.card_type === 'confirm' && (
+                              <div style={{
+                                background: 'linear-gradient(135deg, rgba(139,92,246,0.05), rgba(59,130,246,0.05))',
+                                border: '1px solid rgba(139,92,246,0.2)', borderRadius: 12, padding: 16,
+                              }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#8B5CF6', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  📝 {card.title}
+                                </div>
+                                <div style={{ fontSize: 13, lineHeight: 1.8, marginBottom: 16 }}>
+                                  {card.fields.map((f, fi) => (
+                                    <div key={fi}>{f.label}：{f.value}</div>
+                                  ))}
+                                </div>
+                                <div style={{ display: 'flex', gap: 10 }}>
+                                  <button onClick={() => handleQuickSend('修改')} style={{
+                                    flex: 1, padding: '10px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                                    cursor: 'pointer', background: '#fff', border: '1px solid #E5E7EB', color: '#666',
+                                  }}>修改</button>
+                                  <button onClick={() => handleQuickSend('确认提交')} style={{
+                                    flex: 1, padding: '10px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+                                    cursor: 'pointer', background: 'linear-gradient(135deg, #8B5CF6, #3B82F6)',
+                                    border: 'none', color: '#fff',
+                                  }}>确认提交</button>
+                                </div>
+                              </div>
+                            )}
+                            {card.card_type === 'complaint' && card.data && (
+                              <div style={{
+                                background: '#fff', borderRadius: 12, padding: 16, border: '1px solid #E5E7EB',
+                              }}>
+                                {(() => {
+                                  const d = card.data;
+                                  const items = d?.data?.items || d?.items || (Array.isArray(d) ? d : [d]);
+                                  const item = items[0] || {};
+                                  const isDone = (item.status || '').includes('完成') || (item.status || '').includes('done');
+                                  return (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        <div style={{
+                                          width: 40, height: 40, borderRadius: '50%', display: 'flex',
+                                          alignItems: 'center', justifyContent: 'center', fontSize: 20,
+                                          background: isDone ? '#D1FAE5' : '#FEF3C7',
+                                        }}>{isDone ? '✅' : '⏳'}</div>
+                                        <div>
+                                          <h4 style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{item.complaint_no || item.cp_no || item.id || '—'}</h4>
+                                          <p style={{ fontSize: 12, color: '#999', margin: 0 }}>{item.status || '处理中'} · {item.updated_at || item.date || ''}</p>
+                                        </div>
+                                      </div>
+                                      <div style={{ padding: 12, background: '#F5F7FA', borderRadius: 8, fontSize: 13 }}>
+                                        {item.issue && <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}><span style={{ color: '#999', minWidth: 60 }}>问题：</span><span>{item.issue}</span></div>}
+                                        {item.handler && <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}><span style={{ color: '#999', minWidth: 60 }}>处理人：</span><span>{item.handler}</span></div>}
+                                        {item.result && <div style={{ display: 'flex', gap: 8 }}><span style={{ color: '#999', minWidth: 60 }}>结果：</span><span>{item.result}</span></div>}
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            )}
+                            {card.card_type === 'staff' && card.data && (
+                              <div style={{
+                                background: '#fff', borderRadius: 12, padding: 16, border: '1px solid #E5E7EB',
+                              }}>
+                                {(() => {
+                                  const d = card.data;
+                                  const items = d?.data?.items || d?.items || (Array.isArray(d) ? d : [d]);
+                                  return (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                      {items.map((person: any, pi: number) => (
+                                        <div key={pi} style={{
+                                          display: 'flex', alignItems: 'center', gap: 10, padding: 8,
+                                          background: person.is_leader ? 'linear-gradient(135deg, rgba(139,92,246,0.1), rgba(59,130,246,0.1))' : '#F5F7FA',
+                                          border: person.is_leader ? '1px solid rgba(139,92,246,0.2)' : 'none',
+                                          borderRadius: 8,
+                                        }}>
+                                          <div style={{
+                                            width: 36, height: 36, borderRadius: '50%',
+                                            background: 'linear-gradient(135deg, #8B5CF6, #3B82F6)',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            color: '#fff', fontSize: 14, fontWeight: 600,
+                                          }}>{(person.name || '?').slice(0, 1)}</div>
+                                          <div style={{ flex: 1 }}>
+                                            <div style={{ fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                              {person.name}
+                                              {person.is_leader && <span style={{ padding: '2px 6px', background: '#8B5CF6', color: '#fff', borderRadius: 4, fontSize: 10 }}>负责人</span>}
+                                            </div>
+                                            <div style={{ fontSize: 11, color: '#999' }}>{person.department || person.dept || ''}</div>
+                                          </div>
+                                          {person.phone && <div style={{ fontSize: 12, color: '#3B82F6' }}>📞 {person.phone}</div>}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            )}
+                            {card.card_type === 'quick_actions' && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+                                {card.actions.map((a, ai) => (
+                                  <button key={ai} onClick={() => handleQuickSend(a.action)} style={{
+                                    padding: '8px 14px', borderRadius: 100, fontSize: 12, cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s',
+                                    ...(a.primary
+                                      ? { background: 'linear-gradient(135deg, #8B5CF6, #3B82F6)', border: 'none', color: '#fff' }
+                                      : { background: '#fff', border: '1px solid #E5E7EB', color: '#666' }),
+                                  }}>{a.icon} {a.text}</button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
                         {msg.intent && (
                           <Tag color="purple" style={{ alignSelf: 'flex-start', fontSize: 11, borderRadius: 10 }}>{msg.intent}</Tag>
                         )}
@@ -591,6 +716,28 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
           background: '#fff',
           borderTop: '1px solid #E5E7EB',
         }}>
+          {/* 快捷入口 */}
+          <div style={{ maxWidth: 768, margin: '0 auto 8px', display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+            {[
+              { icon: '📊', text: '查进度' },
+              { icon: '👥', text: '查人员' },
+              { icon: '📋', text: '查服务' },
+              { icon: '📝', text: '提投诉' },
+              { icon: '📞', text: '联系人' },
+            ].map((s) => (
+              <span
+                key={s.text}
+                onClick={() => handleQuickSend(`${s.icon} ${s.text}`)}
+                style={{
+                  padding: '4px 12px', borderRadius: 100, fontSize: 12, cursor: 'pointer',
+                  background: '#F5F7FA', color: '#666', transition: 'all 0.2s',
+                  border: '1px solid transparent',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#8B5CF6'; e.currentTarget.style.color = '#8B5CF6'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.color = '#666'; }}
+              >{s.icon} {s.text}</span>
+            ))}
+          </div>
           <div style={{
             maxWidth: 768, margin: '0 auto',
             background: '#F5F7FA', borderRadius: 24,

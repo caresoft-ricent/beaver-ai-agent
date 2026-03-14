@@ -66,6 +66,7 @@ def call_llm_for_intent(
     user_message: str,
     available_intents: list[dict],
     context: Optional[dict] = None,
+    custom_prompt: Optional[str] = None,
 ) -> dict:
     """专门用于意图识别的LLM调用"""
     intents_desc = "\n".join([
@@ -77,7 +78,13 @@ def call_llm_for_intent(
     if context and context.get("current_line"):
         context_str = f"\n当前上下文：正在讨论产线 {context['current_line']}"
 
-    system_prompt = f"""你是一个意图识别助手。请分析用户输入，返回JSON格式的意图识别结果。
+    if custom_prompt:
+        system_prompt = custom_prompt.format(
+            intents_desc=intents_desc,
+            context_str=context_str,
+        )
+    else:
+        system_prompt = f"""你是一个意图识别助手。请分析用户输入，返回JSON格式的意图识别结果。
 
 可选意图：
 {intents_desc}
@@ -121,15 +128,16 @@ def call_llm_for_entities(
     known_entities: dict,
     entity_definitions: list[dict],
     context: Optional[dict] = None,
+    custom_prompt: Optional[str] = None,
 ) -> dict:
     """LLM增强实体抽取 — 从用户输入中提取结构化参数
 
-    entity_definitions: [{"name": "line_name", "title": "产线名称", "type": "string", "required": true}, ...]
+    entity_definitions: [{"name": "line_name", "title": "产线名称", "type": "string", "required": true, "llm_description": ...}, ...]
     返回: {"entities": {"line_name": "A线", ...}, "tokens_used": 123}
     """
     entities_desc = "\n".join([
         f"- {e['name']}({e.get('title', e['name'])}): 类型={e.get('type', 'string')}, "
-        f"{'必填' if e.get('required') else '选填'}, {e.get('description', '')}"
+        f"{'必填' if e.get('required') else '选填'}, {e.get('llm_description') or e.get('description', '')}"
         for e in entity_definitions
     ])
 
@@ -141,7 +149,15 @@ def call_llm_for_entities(
     if known_entities:
         known_str = f"\n已通过规则提取的实体：{json.dumps(known_entities, ensure_ascii=False)}"
 
-    system_prompt = f"""你是一个实体抽取助手。请从用户输入中提取以下参数。
+    if custom_prompt:
+        system_prompt = custom_prompt.format(
+            intent_code=intent_code,
+            entities_desc=entities_desc,
+            known_str=known_str,
+            context_str=context_str,
+        )
+    else:
+        system_prompt = f"""你是一个实体抽取助手。请从用户输入中提取以下参数。
 
 当前意图: {intent_code}
 需要提取的参数:

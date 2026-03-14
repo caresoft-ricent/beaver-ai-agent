@@ -11,6 +11,7 @@ import {
 import {
   getEntities, getEntity, createEntity, updateEntity, deleteEntity, publishEntity,
   getConnectors, createAction, deleteAction, createEntityProperty, deleteEntityProperty,
+  updateEntityProperty,
 } from '../api/admin';
 
 const { Text } = Typography;
@@ -28,7 +29,21 @@ interface Entity {
 }
 
 interface ConnectorItem { id: number; name: string; }
-interface PropertyItem { id: number; entity_id: number; name: string; title?: string; type: string; is_input: boolean; is_output: boolean; is_required: boolean; }
+interface PropertyItem {
+  id: number;
+  entity_id: number;
+  name: string;
+  title?: string;
+  type: string;
+  is_input: boolean;
+  is_output: boolean;
+  is_required: boolean;
+  property_description?: string;
+  llm_description?: string;
+  extract_expression?: string;
+  normalization_config?: Record<string, unknown>;
+  mapping_config?: Record<string, unknown>;
+}
 interface ActionItem { id: number; entity_id: number; action_code: string; action_name: string; http_method: string; api_path?: string; }
 
 const modeIcon: Record<string, React.ReactNode> = {
@@ -59,6 +74,9 @@ export default function EntityList() {
   // Sub-forms
   const [propForm] = Form.useForm();
   const [actionForm] = Form.useForm();
+  const [propEditForm] = Form.useForm();
+  const [propEditOpen, setPropEditOpen] = useState(false);
+  const [editingProp, setEditingProp] = useState<PropertyItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -125,6 +143,32 @@ export default function EntityList() {
   const handleDeleteProperty = async (propId: number) => {
     await deleteEntityProperty(propId);
     message.success('已删除');
+    if (detailEntity) openDetail(detailEntity);
+  };
+
+  const openPropEdit = (record: PropertyItem) => {
+    setEditingProp(record);
+    propEditForm.setFieldsValue({
+      ...record,
+      normalization_config: record.normalization_config ? JSON.stringify(record.normalization_config, null, 2) : '',
+      mapping_config: record.mapping_config ? JSON.stringify(record.mapping_config, null, 2) : '',
+    });
+    setPropEditOpen(true);
+  };
+
+  const handlePropEditSave = async () => {
+    if (!editingProp) return;
+    const values = await propEditForm.validateFields();
+    if (values.normalization_config && typeof values.normalization_config === 'string') {
+      try { values.normalization_config = JSON.parse(values.normalization_config); } catch { message.error('归一化配置JSON格式错误'); return; }
+    }
+    if (values.mapping_config && typeof values.mapping_config === 'string') {
+      try { values.mapping_config = JSON.parse(values.mapping_config); } catch { message.error('映射配置JSON格式错误'); return; }
+    }
+    await updateEntityProperty(editingProp.id, values);
+    message.success('属性已更新');
+    setPropEditOpen(false);
+    setEditingProp(null);
     if (detailEntity) openDetail(detailEntity);
   };
 
@@ -294,11 +338,25 @@ export default function EntityList() {
                     { title: '输出', dataIndex: 'is_output', width: 50, align: 'center' as const, render: (v: boolean) => v ? <Tag color="green">是</Tag> : '—' },
                     { title: '必填', dataIndex: 'is_required', width: 50, align: 'center' as const, render: (v: boolean) => v ? <Tag color="red">是</Tag> : '—' },
                     {
-                      title: '', width: 50,
+                      title: '增强', width: 100, align: 'center' as const,
                       render: (_: unknown, record: PropertyItem) => (
-                        <Popconfirm title="删除此属性?" onConfirm={() => handleDeleteProperty(record.id)}>
-                          <Button size="small" danger icon={<DeleteOutlined />} />
-                        </Popconfirm>
+                        <Space size={2}>
+                          {record.llm_description && <Tag color="purple" style={{margin:0}}>描述</Tag>}
+                          {record.extract_expression && <Tag color="cyan" style={{margin:0}}>提取</Tag>}
+                          {record.normalization_config && <Tag color="blue" style={{margin:0}}>归一</Tag>}
+                          {record.mapping_config && <Tag color="orange" style={{margin:0}}>映射</Tag>}
+                        </Space>
+                      ),
+                    },
+                    {
+                      title: '', width: 90,
+                      render: (_: unknown, record: PropertyItem) => (
+                        <Space size="small">
+                          <Button size="small" type="link" onClick={() => openPropEdit(record)}>编辑</Button>
+                          <Popconfirm title="删除此属性?" onConfirm={() => handleDeleteProperty(record.id)}>
+                            <Button size="small" danger icon={<DeleteOutlined />} />
+                          </Popconfirm>
+                        </Space>
                       ),
                     },
                   ]}
@@ -381,6 +439,44 @@ export default function EntityList() {
             </Card>
           </>
         )}
+      </Modal>
+
+      {/* 属性编辑 Modal */}
+      <Modal
+        title={`编辑属性 — ${editingProp?.name || ''}`}
+        open={propEditOpen}
+        onOk={handlePropEditSave}
+        onCancel={() => { setPropEditOpen(false); setEditingProp(null); }}
+        width={680}
+        destroyOnClose
+      >
+        <Form form={propEditForm} layout="vertical" style={{ marginTop: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <Form.Item name="title" label="标题(中文)">
+              <Input placeholder="如: 产线名称" />
+            </Form.Item>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end' }}>
+              <Form.Item name="is_input" valuePropName="checked" label="输入"><Switch /></Form.Item>
+              <Form.Item name="is_output" valuePropName="checked" label="输出"><Switch /></Form.Item>
+              <Form.Item name="is_required" valuePropName="checked" label="必填"><Switch /></Form.Item>
+            </div>
+          </div>
+          <Form.Item name="llm_description" label="LLM描述" tooltip="给大模型看的参数含义描述，帮助精确理解此字段">
+            <Input.TextArea rows={2} placeholder="如: 生产线的唯一名称标识，通常格式为字母+数字组合如 25B1339-G" />
+          </Form.Item>
+          <Form.Item name="extract_expression" label="提取规则(express)" tooltip="正则表达式或规则，用于从用户消息中兜底提取此参数">
+            <Input placeholder="如: (?P<line_name>[A-Z0-9]{2,}[-][A-Z0-9]+)" />
+          </Form.Item>
+          <Form.Item name="normalization_config" label="归一化配置(normalization)" tooltip="同义词映射、日期转换等归一化规则 (JSON)">
+            <Input.TextArea rows={3} placeholder={'如: {"synonyms": {"一号线": "LINE-001"}, "domain": "order_status"}'} />
+          </Form.Item>
+          <Form.Item name="mapping_config" label="映射转换配置(mapping)" tooltip="参数值转换规则，如产线名称→产线ID，需调用业务接口 (JSON)">
+            <Input.TextArea rows={3} placeholder={'如: {"lookup_entity": "production_line", "lookup_action": "list", "match_field": "line_name", "return_field": "line_code", "strategy": "semantic"}'} />
+          </Form.Item>
+          <Form.Item name="property_description" label="属性描述">
+            <Input.TextArea rows={2} placeholder="一般描述，非LLM专用" />
+          </Form.Item>
+        </Form>
       </Modal>
     </>
   );

@@ -26,10 +26,15 @@ class Skill(Base):
     intent_prompt = Column(Text, comment="意图识别提示词模板")
     response_prompt = Column(Text, comment="回答生成提示词模板")
     response_template = Column(Text, comment="回答文本模板(变量插值)")
+    entity_extract_prompt = Column(Text, comment="实体抽取提示词模板")
     # 澄清交互配置
     clarification_config = Column(JSON, comment="澄清交互配置(JSON)")
     # 关联大模型
     llm_config_id = Column(BigInteger, comment="关联大模型配置ID")
+    # LLM 约束
+    max_response_tokens = Column(Integer, default=0, comment="最大回复Token(0=使用默认)")
+    max_tool_calls = Column(Integer, default=10, comment="单轮最大工具调用次数")
+    summary_threshold = Column(Integer, default=20, comment="触发历史摘要的轮次阈值")
     # 状态
     status = Column(String(16), nullable=False, default="draft", comment="draft/published")
     version = Column(Integer, default=1, comment="配置版本号")

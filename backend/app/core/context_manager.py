@@ -128,7 +128,6 @@ def normalize_date(text: str, db: Session = None) -> Optional[dict]:
         if re.search(pattern, text):
             start, end = fn()
             return {"date_start": str(start), "date_end": str(end)}
-            return {"date_start": str(start), "date_end": str(end)}
 
     # 尝试绝对日期
     m = re.search(r"(\d{4})[年\-/](\d{1,2})[月\-/](\d{1,2})[日号]?", text)
@@ -264,66 +263,196 @@ def _load_db_status_map(db: Session) -> dict[str, dict[str, str]]:
 
 # ─────────────────────────── 3. 参数转换 ───────────────────────────
 
-# 转换注册表：{ "entity_code.param_name" : callable(db, value) -> converted_value }
-_CONVERTERS: dict[str, callable] = {}
-
-
-def register_converter(entity_param_key: str, fn):
-    """注册参数转换器。key 格式: 'production_line.line_name' """
-    _CONVERTERS[entity_param_key] = fn
-
 
 def convert_params(db: Session, entities: dict, skill: Skill = None) -> dict:
     """
     运行参数转换：将用户表达（如产线名称）转换为接口所需的值（如产线ID）。
-    转换规则从 SkillTool.config.param_converters 或全局注册表中读取。
+
+    转换规则来源:
+    1. EntityProperty.mapping_config  — 属性级别的映射配置
+       格式: {
+         "lookup_entity": "production_line",   # 查找哪个本体
+         "lookup_action": "list",              # 调用哪个接口获取数据
+         "match_field": "line_name",           # 返回数据中用于匹配的字段
+         "return_field": "line_code",          # 匹配命中后取哪个字段作为转换值
+         "target_param": "line_code",          # 写入哪个实体参数(默认=属性自身name)
+         "strategy": "exact|fuzzy|semantic"    # 匹配策略
+       }
+    2. 通过 ConnectorClient 调用真实业务 API 获取候选数据
+    3. 前者若无法精确匹配，使用模糊/语义匹配
     """
     result = dict(entities)
-    if skill and hasattr(skill, '_tool_converters'):
-        for conv in skill._tool_converters:
-            src = conv.get("source")
-            target = conv.get("target")
-            lookup_entity = conv.get("lookup_entity")
-            lookup_field = conv.get("lookup_field", "name")
-            target_field = conv.get("target_field", "id")
-            if src and src in result and lookup_entity:
-                converted = _lookup_convert(
-                    db, lookup_entity, lookup_field, result[src], target_field
-                )
-                if converted is not None:
-                    result[target or src] = converted
+    if not skill:
+        return result
 
-    # 全局转换器
-    for key, fn in _CONVERTERS.items():
-        parts = key.split(".")
-        param_name = parts[-1] if len(parts) > 1 else parts[0]
-        if param_name in result:
-            try:
-                result[param_name] = fn(db, result[param_name])
-            except Exception:
-                pass
+    # 收集技能工具链涉及的所有 entity_id
+    tools = (
+        db.query(SkillTool)
+        .filter(SkillTool.skill_id == skill.id)
+        .order_by(SkillTool.order_no)
+        .all()
+    )
+    entity_ids = {t.entity_id for t in tools if t.entity_id}
+    if not entity_ids:
+        return result
+
+    # 加载所有有 mapping_config 的输入属性
+    props = (
+        db.query(EntityProperty)
+        .filter(
+            EntityProperty.entity_id.in_(entity_ids),
+            EntityProperty.is_input == True,
+            EntityProperty.mapping_config.isnot(None),
+        )
+        .all()
+    )
+
+    for prop in props:
+        mapping = prop.mapping_config
+        if not isinstance(mapping, dict):
+            continue
+
+        param_name = prop.name
+        if param_name not in result:
+            continue
+
+        user_value = str(result[param_name]).strip()
+        if not user_value:
+            continue
+
+        lookup_entity = mapping.get("lookup_entity")
+        lookup_action = mapping.get("lookup_action", "list")
+        match_field = mapping.get("match_field")
+        return_field = mapping.get("return_field")
+        target_param = mapping.get("target_param", param_name)
+        strategy = mapping.get("strategy", "exact")
+
+        if not all([lookup_entity, match_field, return_field]):
+            continue
+
+        # 调用业务 API 获取候选数据
+        candidates = _fetch_lookup_data(db, lookup_entity, lookup_action)
+        if not candidates:
+            continue
+
+        # 匹配
+        converted = _match_candidate(
+            user_value, candidates, match_field, return_field, strategy
+        )
+        if converted is not None:
+            result[target_param] = converted
 
     return result
 
 
-def _lookup_convert(db: Session, entity_code: str, match_field: str,
-                    match_value: str, return_field: str):
-    """通过查表进行参数转换（如：产线名称 → 产线ID）"""
+def _fetch_lookup_data(db: Session, entity_code: str, action_code: str) -> list[dict]:
+    """通过 ConnectorClient 调用业务 API 获取候选数据列表"""
     from app.models.ontology import Entity
+    from app.models.action import Action
+    from app.models.config import Connector
+    from app.clients.connector_client import ConnectorClient
+
     entity = db.query(Entity).filter(Entity.entity_code == entity_code).first()
     if not entity:
-        return None
-    # 如果有连接器，可通过API查询；此处先用 action.mock_response 做静态查找
-    from app.models.action import Action
+        return []
+
     action = db.query(Action).filter(
-        Action.entity_id == entity.id, Action.action_code == "list"
+        Action.entity_id == entity.id, Action.action_code == action_code
     ).first()
-    if action and action.mock_response:
+    if not action:
+        return []
+
+    # 优先使用真实连接器
+    connector = None
+    if entity.connector_id:
+        connector = db.query(Connector).filter(Connector.id == entity.connector_id).first()
+
+    if connector:
+        cli = ConnectorClient({
+            "base_url": connector.base_url,
+            "auth_type": connector.auth_type,
+            "auth_config": connector.auth_config,
+            "timeout": connector.timeout,
+            "mock_enabled": connector.mock_enabled,
+        })
+        try:
+            resp = cli.call_action(
+                action_config={
+                    "http_method": action.http_method,
+                    "api_path": action.api_path,
+                    "request_template": action.request_template,
+                    "response_mapping": action.response_mapping,
+                },
+                params={},
+                mock_response=action.mock_response,
+            )
+            items = resp.get("data", {}).get("items", []) if isinstance(resp.get("data"), dict) else []
+            return items if isinstance(items, list) else []
+        except Exception:
+            pass
+
+    # 回退到 mock_response
+    if action.mock_response:
         items = action.mock_response.get("data", {}).get("items", [])
-        if isinstance(items, list):
-            for item in items:
-                if str(item.get(match_field, "")).strip() == str(match_value).strip():
-                    return item.get(return_field)
+        return items if isinstance(items, list) else []
+
+    return []
+
+
+def _match_candidate(
+    user_value: str,
+    candidates: list[dict],
+    match_field: str,
+    return_field: str,
+    strategy: str = "exact",
+):
+    """在候选列表中匹配用户输入值，返回匹配到的目标字段值"""
+    user_lower = user_value.lower().strip()
+
+    # 1. 精确匹配
+    for item in candidates:
+        candidate_val = str(item.get(match_field, "")).strip()
+        if candidate_val == user_value:
+            return item.get(return_field)
+
+    if strategy == "exact":
+        return None
+
+    # 2. 模糊匹配: 大小写无关 + 包含关系
+    best_match = None
+    best_score = 0
+    for item in candidates:
+        candidate_val = str(item.get(match_field, "")).strip()
+        candidate_lower = candidate_val.lower()
+
+        if candidate_lower == user_lower:
+            return item.get(return_field)
+
+        # 包含关系匹配
+        if user_lower in candidate_lower or candidate_lower in user_lower:
+            score = len(min(user_lower, candidate_lower, key=len)) / len(max(user_lower, candidate_lower, key=len))
+            if score > best_score:
+                best_score = score
+                best_match = item
+
+    if strategy == "fuzzy" and best_match and best_score > 0.5:
+        return best_match.get(return_field)
+
+    # 3. semantic 策略: 基于字符串相似度做进一步匹配
+    if strategy == "semantic":
+        if best_match and best_score > 0.3:
+            return best_match.get(return_field)
+
+        # 尝试数字/拼音等变体匹配
+        for item in candidates:
+            candidate_val = str(item.get(match_field, "")).strip()
+            # 别名检查: 如果候选项有 aliases 字段
+            aliases = item.get("aliases", [])
+            if isinstance(aliases, list):
+                for alias in aliases:
+                    if str(alias).strip().lower() == user_lower:
+                        return item.get(return_field)
+
     return None
 
 
@@ -422,3 +551,69 @@ def build_clarification_reply(slot_result: SlotResult, optional_missing: list = 
     if slot_result.clarification_text and not slot_result.missing_required:
         parts.append(slot_result.clarification_text)
     return "\n".join(parts) if parts else ""
+
+
+# ─────────────────────────── 5. 上下文摘要 ───────────────────────────
+
+def should_summarize(ctx: dict, threshold: int = 20) -> bool:
+    """判断是否需要触发历史摘要"""
+    turn_count = ctx.get("turn_count", 0)
+    last_summary_turn = ctx.get("last_summary_turn", 0)
+    return turn_count - last_summary_turn >= threshold
+
+
+def summarize_context(
+    db: Session,
+    session_id: str,
+    ctx: dict,
+    llm_caller=None,
+) -> str:
+    """对多轮上下文进行摘要压缩，减少Token消耗
+
+    llm_caller: callable(messages, system_prompt) -> str (可选，用LLM生成摘要)
+    返回摘要文本。
+    """
+    from app.models.chat import ChatMessage
+
+    messages = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.session_id == session_id)
+        .order_by(ChatMessage.created_at.desc())
+        .limit(40)
+        .all()
+    )
+    messages.reverse()
+
+    if len(messages) < 6:
+        return ""
+
+    # 构建对话文本
+    dialog_text = "\n".join([
+        f"{'用户' if m.role == 'user' else 'AI'}: {m.content[:200]}"
+        for m in messages if m.role in ("user", "assistant") and m.content
+    ])
+
+    if llm_caller:
+        try:
+            summary = llm_caller(
+                messages=[{"role": "user", "content": f"请用2-3句话概括以下对话的核心议题和已确认信息：\n\n{dialog_text}"}],
+                system_prompt="你是对话摘要助手，请简洁概括对话核心内容，保留关键实体和意图信息。",
+            )
+            ctx["summary"] = summary
+            ctx["last_summary_turn"] = ctx.get("turn_count", 0)
+            return summary
+        except Exception:
+            pass
+
+    # 无LLM时的简要摘要
+    intents = ctx.get("history_intents", [])
+    entities = ctx.get("entities", {})
+    summary_parts = []
+    if intents:
+        summary_parts.append(f"用户历史意图: {', '.join(set(intents[-5:]))}")
+    if entities:
+        summary_parts.append(f"已知参数: {json.dumps(entities, ensure_ascii=False)}")
+    summary = "; ".join(summary_parts)
+    ctx["summary"] = summary
+    ctx["last_summary_turn"] = ctx.get("turn_count", 0)
+    return summary

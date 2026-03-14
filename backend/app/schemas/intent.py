@@ -14,8 +14,12 @@ class SkillCreate(BaseModel):
     intent_prompt: Optional[str] = None
     response_prompt: Optional[str] = None
     response_template: Optional[str] = None
+    entity_extract_prompt: Optional[str] = None
     clarification_config: Optional[dict] = None
     llm_config_id: Optional[int] = None
+    max_response_tokens: Optional[int] = 0
+    max_tool_calls: Optional[int] = 10
+    summary_threshold: Optional[int] = 20
     sort_order: int = 0
 
 
@@ -28,8 +32,12 @@ class SkillUpdate(BaseModel):
     intent_prompt: Optional[str] = None
     response_prompt: Optional[str] = None
     response_template: Optional[str] = None
+    entity_extract_prompt: Optional[str] = None
     clarification_config: Optional[dict] = None
     llm_config_id: Optional[int] = None
+    max_response_tokens: Optional[int] = None
+    max_tool_calls: Optional[int] = None
+    summary_threshold: Optional[int] = None
     sort_order: Optional[int] = None
     status: Optional[str] = None
 
@@ -39,14 +47,21 @@ class SkillOut(BaseModel):
     tenant_id: int
     skill_name: str
     skill_code: str
-    skill_description: Optional[str]
-    match_keywords: Optional[list]
-    match_patterns: Optional[list]
-    llm_config_id: Optional[int]
+    skill_description: Optional[str] = None
+    match_keywords: Optional[list] = None
+    match_patterns: Optional[list] = None
+    intent_prompt: Optional[str] = None
+    response_prompt: Optional[str] = None
+    response_template: Optional[str] = None
+    entity_extract_prompt: Optional[str] = None
+    llm_config_id: Optional[int] = None
+    max_response_tokens: Optional[int] = None
+    max_tool_calls: Optional[int] = None
+    summary_threshold: Optional[int] = None
     status: str
     version: int
     sort_order: int
-    created_at: Optional[datetime]
+    created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 

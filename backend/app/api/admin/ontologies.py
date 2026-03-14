@@ -8,7 +8,7 @@ from app.models.ontology import Entity, EntityProperty, EntityRelation, BaseProp
 from app.models.action import Action, ActionParameter
 from app.schemas.ontology import (
     EntityCreate, EntityUpdate, EntityOut,
-    EntityPropertyCreate, EntityPropertyOut,
+    EntityPropertyCreate, EntityPropertyUpdate, EntityPropertyOut,
     EntityRelationCreate, EntityRelationOut,
     BasePropertyCreate, BasePropertyOut,
     ActionCreate, ActionOut,
@@ -124,6 +124,18 @@ def delete_entity_property(property_id: int, db: Session = Depends(get_db)):
     db.delete(prop)
     db.commit()
     return ResponseBase(message="删除成功")
+
+
+@router.put("/properties/{property_id}")
+def update_entity_property(property_id: int, req: EntityPropertyUpdate, db: Session = Depends(get_db)):
+    prop = db.query(EntityProperty).filter(EntityProperty.id == property_id).first()
+    if not prop:
+        raise HTTPException(status_code=404, detail="属性不存在")
+    for key, value in req.model_dump(exclude_unset=True).items():
+        setattr(prop, key, value)
+    db.commit()
+    db.refresh(prop)
+    return ResponseBase(data=EntityPropertyOut.model_validate(prop).model_dump())
 
 
 # ===== EntityRelation CRUD =====

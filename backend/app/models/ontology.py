@@ -7,7 +7,7 @@ rc_ai_entity_relation → EntityRelation (本体关系)
 rc_ai_base_property   → BaseProperty (基础属性模板)
 """
 from sqlalchemy import (
-    Column, BigInteger, String, Text, DateTime, Boolean, Integer, func
+    Column, BigInteger, String, Text, DateTime, Boolean, Integer, JSON, func
 )
 from app.database import Base
 
@@ -61,6 +61,11 @@ class EntityProperty(Base):
     is_required = Column(Boolean, default=False, comment="是否必填")
     property_description = Column(Text, comment="属性描述")
     required_description = Column(Text, comment="必填说明")
+    # ── 大模型增强字段 ──
+    llm_description = Column(Text, comment="给大模型看的描述(用于精确理解此参数含义)")
+    extract_expression = Column(Text, comment="参数兜底提取规则(正则或表达式)")
+    normalization_config = Column(JSON, comment="归一化配置: 同义词/日期/枚举转换规则(JSON)")
+    mapping_config = Column(JSON, comment="参数映射配置: 转换规则如名称→ID(JSON)")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
