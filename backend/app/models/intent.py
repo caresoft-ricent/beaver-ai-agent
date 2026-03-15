@@ -36,6 +36,10 @@ class Skill(Base):
     max_response_tokens = Column(Integer, default=0, comment="最大回复Token(0=使用默认)")
     max_tool_calls = Column(Integer, default=10, comment="单轮最大工具调用次数")
     summary_threshold = Column(Integer, default=20, comment="触发历史摘要的轮次阈值")
+    # 编排
+    flow_type = Column(String(16), nullable=False, default="simple",
+                       comment="流程类型: simple=线性工具链 | workflow=编排流程")
+    workflow_config = Column(JSON, comment="编排流程定义(flow_type=workflow时使用)")
     # 状态
     status = Column(String(16), nullable=False, default="draft", comment="draft/published")
     version = Column(Integer, default=1, comment="配置版本号")

@@ -29,6 +29,7 @@ from app.core.context_manager import (
     should_summarize, summarize_context,
 )
 from app.core.evidence import EvidenceCollector
+from app.core.workflow_engine import WorkflowExecutor
 
 
 async def stream_dialog(
@@ -253,7 +254,26 @@ async def _stream_dialog_inner(
                 save_context(db, session_id, ctx)
                 return
 
-    # -- Step 7: 执行工具链 --
+    # -- Step 7: 执行工具链 / 编排流程 --
+    flow_type = getattr(matched_skill, 'flow_type', 'simple') or 'simple'
+
+    if flow_type == 'workflow' and matched_skill.workflow_config:
+        # ── 编排模式: 走 WorkflowExecutor ──
+        executor = WorkflowExecutor(
+            db=db, skill=matched_skill, entities=entities,
+            customer_id=customer_id, tenant_id=tenant_id, evidence=evidence,
+        )
+        for evt in executor.execute():
+            yield evt
+
+        # 编排引擎自带回复节点，直接返回
+        if executor.paused:
+            # confirm 节点暂停 — 保存暂停态到上下文
+            ctx["workflow_paused"] = executor.pause_data
+            save_context(db, session_id, ctx)
+        return
+
+    # ── 简单模式: 线性工具链(现有逻辑不变) ──
     yield agui.step_started("tool_execution")
     t0 = time.time()
 

@@ -6,13 +6,14 @@ import {
 } from 'antd';
 import {
   PlusOutlined, SendOutlined, ThunderboltOutlined, DeleteOutlined,
-  InfoCircleOutlined, LinkOutlined, SearchOutlined,
+  InfoCircleOutlined, LinkOutlined, SearchOutlined, ApartmentOutlined,
 } from '@ant-design/icons';
 import {
   getSkills, createSkill, updateSkill, deleteSkill, publishSkill,
   getSkillTools, createSkillTool, deleteSkillTool,
   getEntities, getActions, getLLMConfigs,
 } from '../api/admin';
+import WorkflowEditor from '../components/WorkflowEditor';
 
 const { Text } = Typography;
 
@@ -33,6 +34,8 @@ interface Skill {
   max_tool_calls?: number;
   summary_threshold?: number;
   llm_config_id?: number;
+  flow_type?: string;
+  workflow_config?: Record<string, unknown> | null;
   sort_order: number;
   status: string;
   version: number;
@@ -71,6 +74,8 @@ export default function SkillList() {
   const [actionOptions, setActionOptions] = useState<ActionItem[]>([]);
   const [toolForm] = Form.useForm();
   const [llmOptions, setLlmOptions] = useState<{id: number; name: string}[]>([]);
+  const [flowType, setFlowType] = useState<string>('simple');
+  const [workflowConfig, setWorkflowConfig] = useState<Record<string, unknown> | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -136,11 +141,15 @@ export default function SkillList() {
     if (editingId) {
       const val = values.category;
       values.category = Array.isArray(val) ? val[0] || '' : val || '';
+      values.flow_type = flowType;
+      values.workflow_config = flowType === 'workflow' ? workflowConfig : null;
       await updateSkill(editingId, values);
       message.success('更新成功');
     } else {
       const val = values.category;
       values.category = Array.isArray(val) ? val[0] || '' : val || '';
+      values.flow_type = flowType;
+      values.workflow_config = flowType === 'workflow' ? workflowConfig : null;
       await createSkill(values);
       message.success('创建成功');
     }
@@ -193,6 +202,8 @@ export default function SkillList() {
 
   const openEdit = (record: Skill) => {
     setEditingId(record.id);
+    setFlowType(record.flow_type || 'simple');
+    setWorkflowConfig(record.workflow_config || null);
     form.setFieldsValue({
       ...record,
       category: record.category ? [record.category] : [],
@@ -205,6 +216,11 @@ export default function SkillList() {
   const columns = [
     { title: '编码', dataIndex: 'skill_code', width: 180 },
     { title: '名称', dataIndex: 'skill_name', width: 140 },
+    { title: '模式', dataIndex: 'flow_type', width: 80, align: 'center' as const,
+      render: (v: string) => v === 'workflow'
+        ? <Tag color="purple" icon={<ApartmentOutlined />}>编排</Tag>
+        : <Tag>简单</Tag>,
+    },
     { title: '分类', dataIndex: 'category', width: 100,
       render: (c: string) => c ? <Tag>{c}</Tag> : <Text type="secondary">未分类</Text>,
     },
@@ -243,7 +259,9 @@ export default function SkillList() {
       title: '操作', width: 280,
       render: (_: unknown, record: Skill) => (
         <Space>
-          <Button size="small" icon={<LinkOutlined />} onClick={() => openToolChain(record.id)}>工具链</Button>
+          <Button size="small" icon={<LinkOutlined />} onClick={() => openToolChain(record.id)}>
+            {record.flow_type === 'workflow' ? '编排' : '工具链'}
+          </Button>
           <Button size="small" onClick={() => openEdit(record)}>编辑</Button>
           <Popconfirm title="确认删除?" okText="确认" cancelText="取消" onConfirm={() => deleteSkill(record.id).then(load)}>
             <Button size="small" danger>删除</Button>
@@ -265,7 +283,7 @@ export default function SkillList() {
           <Button icon={<InfoCircleOutlined />} onClick={() => setGuideVisible(!guideVisible)}>
             {guideVisible ? '收起引导' : '使用说明'}
           </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingId(null); form.resetFields(); setModalOpen(true); }}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => { setEditingId(null); form.resetFields(); setFlowType('simple'); setWorkflowConfig(null); setModalOpen(true); }}>
             新建技能
           </Button>
         </Space>
@@ -315,7 +333,8 @@ export default function SkillList() {
       />
 
       {/* 新建/编辑技能 Modal */}
-      <Modal title={editingId ? '编辑技能' : '新建技能'} open={modalOpen} onOk={handleSubmit} onCancel={() => setModalOpen(false)} width={680} destroyOnClose
+      <Modal title={editingId ? '编辑技能' : '新建技能'} open={modalOpen} onOk={handleSubmit} onCancel={() => { setModalOpen(false); setFlowType('simple'); setWorkflowConfig(null); }}
+        width={flowType === 'workflow' ? 960 : 680} destroyOnClose
         okText="确认" cancelText="取消">
         <Form form={form} layout="vertical" initialValues={{ tenant_id: 1, sort_order: 0 }}>
           <Form.Item name="tenant_id" hidden><Input /></Form.Item>
@@ -337,6 +356,30 @@ export default function SkillList() {
             </Form.Item>
             <div />
           </div>
+
+          <Divider orientation="left" plain>流程模式</Divider>
+
+          <Form.Item label="流程类型" tooltip="简单模式: 线性工具链，适合单步查询；编排模式: 可视化流程，适合多步骤、条件分支、并行等复杂场景">
+            <Select value={flowType} onChange={v => setFlowType(v)} style={{ width: 200 }}
+              options={[
+                { value: 'simple', label: '⚙️ 简单模式 - 线性工具链' },
+                { value: 'workflow', label: '🗂️ 编排模式 - 可视化流程' },
+              ]} />
+          </Form.Item>
+
+          {flowType === 'workflow' && (
+            <Form.Item label="流程编排" tooltip="拖拽节点、连线编排复杂业务流程">
+              <WorkflowEditor
+                value={workflowConfig as any}
+                onChange={cfg => setWorkflowConfig(cfg as any)}
+                entities={entityOptions}
+                onLoadActions={async (entityId) => {
+                  const res = await getActions(entityId);
+                  return res.data.data || [];
+                }}
+              />
+            </Form.Item>
+          )}
 
           <Form.Item name="skill_description" label="描述" tooltip="帮助 AI 理解何时触发此技能">
             <Input.TextArea rows={2} placeholder="当用户询问产线进度、交货状态时触发此技能" />

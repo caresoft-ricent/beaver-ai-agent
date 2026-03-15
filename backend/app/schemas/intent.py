@@ -21,6 +21,8 @@ class SkillCreate(BaseModel):
     max_response_tokens: Optional[int] = 0
     max_tool_calls: Optional[int] = 10
     summary_threshold: Optional[int] = 20
+    flow_type: Optional[str] = "simple"
+    workflow_config: Optional[dict] = None
     sort_order: int = 0
 
 
@@ -40,6 +42,8 @@ class SkillUpdate(BaseModel):
     max_response_tokens: Optional[int] = None
     max_tool_calls: Optional[int] = None
     summary_threshold: Optional[int] = None
+    flow_type: Optional[str] = None
+    workflow_config: Optional[dict] = None
     sort_order: Optional[int] = None
     status: Optional[str] = None
 
@@ -61,6 +65,8 @@ class SkillOut(BaseModel):
     max_response_tokens: Optional[int] = None
     max_tool_calls: Optional[int] = None
     summary_threshold: Optional[int] = None
+    flow_type: Optional[str] = "simple"
+    workflow_config: Optional[dict] = None
     status: str
     version: int
     sort_order: int
