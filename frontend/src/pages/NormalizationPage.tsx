@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Table, Button, Space, Modal, Form, Input, Select, Switch, message, Tabs, Popconfirm, Tag, Card } from 'antd';
-import { PlusOutlined, DatabaseOutlined } from '@ant-design/icons';
+import { PlusOutlined, DatabaseOutlined, SearchOutlined } from '@ant-design/icons';
 import {
   getNormalizationRules,
   createNormalizationRule,
@@ -45,6 +45,7 @@ export default function NormalizationPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Rule | null>(null);
   const [form] = Form.useForm();
+  const [searchText, setSearchText] = useState('');
 
   const fetchRules = useCallback(async () => {
     setLoading(true);
@@ -174,12 +175,22 @@ export default function NormalizationPage() {
     param_converter: converterColumns,
   };
 
+  const filteredRules = useMemo(() => {
+    if (!searchText) return rules;
+    const s = searchText.toLowerCase();
+    return rules.filter(r => r.rule_code?.toLowerCase().includes(s) || r.rule_name?.toLowerCase().includes(s)
+      || r.description?.toLowerCase().includes(s) || r.source_value?.toLowerCase().includes(s)
+      || r.target_value?.toLowerCase().includes(s) || r.domain?.toLowerCase().includes(s));
+  }, [rules, searchText]);
+
   return (
     <div>
       <Card
         title="归一化规则管理"
         extra={
           <Space>
+            <Input placeholder="搜索编码/名称" prefix={<SearchOutlined />} allowClear style={{ width: 180 }}
+              value={searchText} onChange={e => setSearchText(e.target.value)} />
             <Button icon={<DatabaseOutlined />} onClick={handleInit}>初始化默认规则</Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={openAdd}>新增规则</Button>
           </Space>
@@ -197,7 +208,7 @@ export default function NormalizationPage() {
           rowKey="id"
           loading={loading}
           columns={columnsMap[category] || dateColumns}
-          dataSource={rules}
+          dataSource={filteredRules}
           size="small"
           pagination={{ current: page, total, pageSize: 50, onChange: setPage, showTotal: (t) => `共 ${t} 条` }}
         />
