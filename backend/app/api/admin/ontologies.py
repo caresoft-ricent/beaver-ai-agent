@@ -226,6 +226,17 @@ def create_standalone_action(req: ActionCreate, db: Session = Depends(get_db)):
     return ResponseBase(data=ActionOut.model_validate(action).model_dump())
 
 
+# 删除操作参数(放在 /actions/{action_id} 之前避免路由冲突)
+@router.delete("/actions/parameters/{param_id}")
+def delete_action_parameter(param_id: int, db: Session = Depends(get_db)):
+    param = db.query(ActionParameter).filter(ActionParameter.id == param_id).first()
+    if not param:
+        raise HTTPException(status_code=404, detail="参数不存在")
+    db.delete(param)
+    db.commit()
+    return ResponseBase(message="删除成功")
+
+
 # 创建操作(本体下, 兼容旧接口)
 @router.post("/entities/{entity_id}/actions")
 def create_action(entity_id: int, req: ActionCreate, db: Session = Depends(get_db)):

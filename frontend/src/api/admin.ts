@@ -129,6 +129,16 @@ export const updateAction = (actionId: number, data: Record<string, unknown>) =>
 export const deleteAction = (actionId: number) =>
   client.delete(`/admin/ontologies/actions/${actionId}`);
 
+// Action Parameters
+export const getActionParameters = (actionId: number) =>
+  client.get(`/admin/ontologies/actions/${actionId}/parameters`);
+
+export const createActionParameter = (actionId: number, data: Record<string, unknown>) =>
+  client.post(`/admin/ontologies/actions/${actionId}/parameters`, data);
+
+export const deleteActionParameter = (paramId: number) =>
+  client.delete(`/admin/ontologies/actions/parameters/${paramId}`);
+
 // Entity Properties
 export const createEntityProperty = (entityId: number, data: Record<string, unknown>) =>
   client.post(`/admin/ontologies/entities/${entityId}/properties`, data);
