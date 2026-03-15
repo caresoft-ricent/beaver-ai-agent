@@ -1,0 +1,21 @@
+feat: 本体/操作解耦 - Action可独立存在 + 参数名映射
+
+核心改造:
+- Action.entity_id改为可空(NULL=独立操作, 不强制绑定本体)
+- Action新增tenant_id/connector_id/category/tags字段
+- ActionParameter新增source_property字段(来源属性名映射)
+- ConnectorClient新增param_mapping参数, 语义参数名自动转为API参数名
+
+引擎改造(engine/stream_engine/workflow_engine):
+- 操作查找优先通过action_id直接定位, 兼容entity+action回退
+- 连接器查找优先从操作自身connector_id取, 其次从本体取
+- 新增_build_param_mapping()从ActionParameter构建参数映射
+
+Admin API:
+- 新增 GET/POST /actions (全局操作列表+创建独立操作)
+- 新增 GET/PUT /actions/{id} (操作详情含参数+更新)
+- 保留原有 entities/{id}/actions 兼容接口
+
+Alembic迁移: a5e3c8f2d741
+前端: ActionItem接口适配, 新增standalone action API
+文档: WORK_SUMMARY新增解耦架构章节, 使用手册更新

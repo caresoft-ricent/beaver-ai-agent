@@ -1,3 +1,6 @@
+继续河狸云OAuth2对接
+
+
 本体: issue_close (问题关闭)
   └─ 操作: close_issue (POST /api/issues/close)
       └─ 属性(is_input):
