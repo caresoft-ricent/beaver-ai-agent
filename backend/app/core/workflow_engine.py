@@ -228,7 +228,7 @@ class WorkflowExecutor:
         """从ActionParameter构建参数名映射 {api_param_name: source_property_name}"""
         action_params = (
             self.db.query(ActionParameter)
-            .filter(ActionParameter.action_id == action_id, ActionParameter.direction == "input")
+            .filter(ActionParameter.action_id == action_id, ActionParameter.is_input == True)
             .all()
         )
         mapping = {}

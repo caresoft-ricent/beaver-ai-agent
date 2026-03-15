@@ -135,7 +135,7 @@ class BasePropertyOut(BaseModel):
 # ===== Action =====
 class ActionCreate(BaseModel):
     tenant_id: int
-    entity_id: Optional[int] = None
+    entity_id: int
     connector_id: Optional[int] = None
     action_code: str
     action_name: str
@@ -169,7 +169,7 @@ class ActionUpdate(BaseModel):
 class ActionOut(BaseModel):
     id: int
     tenant_id: int
-    entity_id: Optional[int]
+    entity_id: int
     connector_id: Optional[int]
     action_code: str
     action_name: str
@@ -195,7 +195,8 @@ class ActionParameterCreate(BaseModel):
     type: str
     title: Optional[str] = None
     param_description: Optional[str] = None
-    direction: str = "input"
+    is_input: bool = False
+    is_output: bool = False
     is_required: bool = False
     default_value: Optional[str] = None
 
@@ -208,7 +209,9 @@ class ActionParameterOut(BaseModel):
     source_property: Optional[str]
     type: str
     title: Optional[str]
-    direction: str
-    is_required: bool
+    param_description: Optional[str] = None
+    is_input: bool = False
+    is_output: bool = False
+    is_required: bool = False
 
     model_config = {"from_attributes": True}

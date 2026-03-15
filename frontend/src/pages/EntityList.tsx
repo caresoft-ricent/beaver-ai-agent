@@ -47,8 +47,8 @@ interface PropertyItem {
   normalization_config?: Record<string, unknown>;
   mapping_config?: Record<string, unknown>;
 }
-interface ActionItem { id: number; entity_id?: number; tenant_id: number; connector_id?: number; action_code: string; action_name: string; action_description?: string; category?: string; http_method: string; api_path?: string; request_template?: Record<string, unknown>; response_mapping?: Record<string, unknown>; cache_ttl?: number; mock_response?: Record<string, unknown>; tags?: string[]; }
-interface ActionParameterItem { id: number; action_id: number; property_id?: number; name: string; source_property?: string; type: string; title?: string; direction: string; is_required: boolean; }
+interface ActionItem { id: number; entity_id: number; tenant_id: number; connector_id?: number; action_code: string; action_name: string; action_description?: string; category?: string; http_method: string; api_path?: string; request_template?: Record<string, unknown>; response_mapping?: Record<string, unknown>; cache_ttl?: number; mock_response?: Record<string, unknown>; tags?: string[]; }
+interface ActionParameterItem { id: number; action_id: number; property_id?: number; name: string; source_property?: string; type: string; title?: string; param_description?: string; is_input: boolean; is_output: boolean; is_required: boolean; }
 
 const modeIcon: Record<string, React.ReactNode> = {
   api: <ApiOutlined />,
@@ -447,7 +447,7 @@ export default function EntityList() {
           <>
             {/* 属性管理 */}
             <Card size="small" title="属性列表" style={{ marginBottom: 16 }}
-              extra={<Text type="secondary">输入参数=用户提供，输出参数=API返回</Text>}>
+              extra={<Text type="secondary">属性=本体的字段定义，操作参数中可引用这些属性</Text>}>
               {properties.length === 0 ? (
                 <Empty description="暂无属性" style={{ margin: '8px 0' }} />
               ) : (
@@ -456,9 +456,6 @@ export default function EntityList() {
                     { title: '字段名', dataIndex: 'name', width: 120 },
                     { title: '标题', dataIndex: 'title', width: 100 },
                     { title: '类型', dataIndex: 'type', width: 80, render: (t: string) => <Tag>{t}</Tag> },
-                    { title: '输入', dataIndex: 'is_input', width: 50, align: 'center' as const, render: (v: boolean) => v ? <Tag color="blue">是</Tag> : '—' },
-                    { title: '输出', dataIndex: 'is_output', width: 50, align: 'center' as const, render: (v: boolean) => v ? <Tag color="green">是</Tag> : '—' },
-                    { title: '必填', dataIndex: 'is_required', width: 50, align: 'center' as const, render: (v: boolean) => v ? <Tag color="red">是</Tag> : '—' },
                     {
                       title: <Tooltip title="增强字段在对话引擎中用于：LLM描述→精确理解参数含义，提取规则→从消息中抽取参数，归一化→同义词/日期转换，映射→参数值转换(如名称→ID)。点击标签或编辑按钮可维护。">增强 <InfoCircleOutlined style={{fontSize:12}} /></Tooltip>,
                       width: 120, align: 'center' as const,
@@ -505,15 +502,6 @@ export default function EntityList() {
                     { value: 'boolean', label: 'boolean' },
                     { value: 'json', label: 'json' },
                   ]} />
-                </Form.Item>
-                <Form.Item name="is_input" valuePropName="checked" initialValue={false}>
-                  <Switch checkedChildren="输入" unCheckedChildren="输入" />
-                </Form.Item>
-                <Form.Item name="is_output" valuePropName="checked" initialValue={true}>
-                  <Switch checkedChildren="输出" unCheckedChildren="输出" />
-                </Form.Item>
-                <Form.Item name="is_required" valuePropName="checked" initialValue={false}>
-                  <Switch checkedChildren="必填" unCheckedChildren="必填" />
                 </Form.Item>
                 <Form.Item>
                   <Button type="primary" icon={<PlusOutlined />} onClick={handleAddProperty}>添加</Button>
@@ -602,16 +590,9 @@ export default function EntityList() {
         okText="确认" cancelText="取消"
       >
         <Form form={propEditForm} layout="vertical" style={{ marginTop: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <Form.Item name="title" label="标题(中文)">
-              <Input placeholder="如: 产线名称" />
-            </Form.Item>
-            <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end' }}>
-              <Form.Item name="is_input" valuePropName="checked" label="输入"><Switch /></Form.Item>
-              <Form.Item name="is_output" valuePropName="checked" label="输出"><Switch /></Form.Item>
-              <Form.Item name="is_required" valuePropName="checked" label="必填"><Switch /></Form.Item>
-            </div>
-          </div>
+          <Form.Item name="title" label="标题(中文)">
+            <Input placeholder="如: 产线名称" />
+          </Form.Item>
           <Form.Item name="llm_description" label="LLM描述" tooltip="给大模型看的参数含义描述，帮助精确理解此字段">
             <Input.TextArea rows={2} placeholder="如: 生产线的唯一名称标识，通常格式为字母+数字组合如 25B1339-G" />
           </Form.Item>
@@ -703,22 +684,23 @@ export default function EntityList() {
               children: (
                 <div style={{ marginTop: 8 }}>
                   <Alert type="info" showIcon style={{ marginBottom: 12 }}
-                    message="参数映射说明"
-                    description="每个参数定义了操作的API调用参数。「API参数名」是实际发送到外部接口的字段名，「来源属性(source_property)」是本体属性中的语义字段名。引擎会自动将语义字段映射到API参数。"
+                    message="参数配置说明"
+                    description="每个参数可来源于本体属性（自动继承类型/标题/描述），也可手动填写。输入/输出为复选，同一参数可同时为输入和输出。"
                   />
                   {actionParams.length > 0 && (
                     <Table dataSource={actionParams} rowKey="id" size="small" pagination={false} style={{ marginBottom: 12 }}
                       columns={[
-                        { title: 'API参数名', dataIndex: 'name', width: 120 },
+                        { title: 'API参数名', dataIndex: 'name', width: 110 },
                         {
-                          title: <Tooltip title="本体属性中的语义字段名，引擎自动映射">来源属性 <InfoCircleOutlined style={{fontSize:11}} /></Tooltip>,
-                          dataIndex: 'source_property', width: 120,
-                          render: (v: string) => v ? <Tag color="purple">{v}</Tag> : <Text type="secondary">同名</Text>,
+                          title: <Tooltip title="来源于本体属性，可继承类型/标题/描述">来源属性 <InfoCircleOutlined style={{fontSize:11}} /></Tooltip>,
+                          dataIndex: 'source_property', width: 100,
+                          render: (v: string) => v ? <Tag color="purple">{v}</Tag> : <Text type="secondary">手动</Text>,
                         },
-                        { title: '标题', dataIndex: 'title', width: 80 },
-                        { title: '类型', dataIndex: 'type', width: 70, render: (t: string) => <Tag>{t}</Tag> },
-                        { title: '方向', dataIndex: 'direction', width: 60, render: (d: string) => <Tag color={d === 'input' ? 'blue' : 'green'}>{d === 'input' ? '输入' : '输出'}</Tag> },
-                        { title: '必填', dataIndex: 'is_required', width: 50, align: 'center' as const, render: (v: boolean) => v ? <Tag color="red">是</Tag> : '—' },
+                        { title: '标题', dataIndex: 'title', width: 70 },
+                        { title: '类型', dataIndex: 'type', width: 65, render: (t: string) => <Tag>{t}</Tag> },
+                        { title: '输入', dataIndex: 'is_input', width: 45, align: 'center' as const, render: (v: boolean) => v ? <Tag color="blue">是</Tag> : '—' },
+                        { title: '输出', dataIndex: 'is_output', width: 45, align: 'center' as const, render: (v: boolean) => v ? <Tag color="green">是</Tag> : '—' },
+                        { title: '必填', dataIndex: 'is_required', width: 45, align: 'center' as const, render: (v: boolean) => v ? <Tag color="red">是</Tag> : '—' },
                         {
                           title: '', width: 50,
                           render: (_: unknown, record: ActionParameterItem) => (
@@ -732,11 +714,28 @@ export default function EntityList() {
                   )}
                   <Divider plain style={{ margin: '8px 0' }}>添加参数</Divider>
                   <Form form={actionParamForm} layout="inline" style={{ flexWrap: 'wrap', gap: 8 }}>
+                    <Form.Item name="property_id">
+                      <Select allowClear placeholder="来源属性(可选)" style={{ width: 140 }}
+                        onChange={(val: number | undefined) => {
+                          if (val) {
+                            const prop = properties.find(p => p.id === val);
+                            if (prop) {
+                              actionParamForm.setFieldsValue({
+                                name: prop.name,
+                                source_property: prop.name,
+                                type: prop.type,
+                                title: prop.title || '',
+                              });
+                            }
+                          }
+                        }}
+                        options={properties.map(p => ({ value: p.id, label: `${p.name}${p.title ? ` (${p.title})` : ''}` }))} />
+                    </Form.Item>
                     <Form.Item name="name" rules={[{ required: true, message: 'API参数名' }]}>
                       <Input placeholder="API参数名" style={{ width: 110 }} />
                     </Form.Item>
-                    <Form.Item name="source_property">
-                      <Input placeholder="来源属性(可选)" style={{ width: 120 }} />
+                    <Form.Item name="source_property" hidden>
+                      <Input />
                     </Form.Item>
                     <Form.Item name="title">
                       <Input placeholder="标题" style={{ width: 80 }} />
@@ -750,11 +749,11 @@ export default function EntityList() {
                         { value: 'json', label: 'json' },
                       ]} />
                     </Form.Item>
-                    <Form.Item name="direction" initialValue="input">
-                      <Select style={{ width: 80 }} options={[
-                        { value: 'input', label: '输入' },
-                        { value: 'output', label: '输出' },
-                      ]} />
+                    <Form.Item name="is_input" valuePropName="checked" initialValue={true}>
+                      <Switch checkedChildren="输入" unCheckedChildren="输入" />
+                    </Form.Item>
+                    <Form.Item name="is_output" valuePropName="checked" initialValue={false}>
+                      <Switch checkedChildren="输出" unCheckedChildren="输出" />
                     </Form.Item>
                     <Form.Item name="is_required" valuePropName="checked" initialValue={false}>
                       <Switch checkedChildren="必填" unCheckedChildren="可选" />

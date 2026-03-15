@@ -305,7 +305,7 @@ class DialogEngine:
         """
         action_params = (
             self.db.query(ActionParameter)
-            .filter(ActionParameter.action_id == action_id, ActionParameter.direction == "input")
+            .filter(ActionParameter.action_id == action_id, ActionParameter.is_input == True)
             .all()
         )
         mapping = {}

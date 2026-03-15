@@ -468,7 +468,7 @@ def _get_entity_definitions(db: Session, skill: Skill) -> list:
     if entity_ids:
         eps = (
             db.query(EntityProperty)
-            .filter(EntityProperty.entity_id.in_(entity_ids), EntityProperty.is_input == True)
+            .filter(EntityProperty.entity_id.in_(entity_ids))
             .all()
         )
         for ep in eps:
@@ -499,7 +499,7 @@ def _get_entity_definitions(db: Session, skill: Skill) -> list:
         if tool.action_id:
             action_params = (
                 db.query(ActionParameter)
-                .filter(ActionParameter.action_id == tool.action_id, ActionParameter.direction == "input")
+                .filter(ActionParameter.action_id == tool.action_id, ActionParameter.is_input == True)
                 .all()
             )
             for ap in action_params:
@@ -522,7 +522,7 @@ def _build_param_mapping(db: Session, action_id: int) -> Optional[dict]:
     """从ActionParameter构建参数名映射 {api_param_name: source_property_name}"""
     action_params = (
         db.query(ActionParameter)
-        .filter(ActionParameter.action_id == action_id, ActionParameter.direction == "input")
+        .filter(ActionParameter.action_id == action_id, ActionParameter.is_input == True)
         .all()
     )
     mapping = {}

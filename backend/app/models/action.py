@@ -11,12 +11,12 @@ from app.database import Base
 
 
 class Action(Base):
-    """操作 - API调用定义，可绑定本体也可独立存在 (殷明: rc_ai_action)"""
+    """操作 - API调用定义，必须关联本体 (殷明: rc_ai_action)"""
     __tablename__ = "ai_action"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     tenant_id = Column(BigInteger, nullable=False, index=True, comment="租户ID")
-    entity_id = Column(BigInteger, nullable=True, index=True, comment="所属本体ID(可选, NULL=独立操作)")
+    entity_id = Column(BigInteger, nullable=False, index=True, comment="所属本体ID")
     connector_id = Column(BigInteger, nullable=True, index=True, comment="关联连接器ID(独立操作时必填)")
     action_code = Column(String(64), nullable=False, comment="操作编码")
     action_name = Column(String(128), nullable=False, comment="操作名称")
@@ -45,7 +45,9 @@ class ActionParameter(Base):
     type = Column(String(32), nullable=False, comment="参数类型")
     title = Column(String(128), comment="参数标题(中文)")
     param_description = Column(Text, comment="参数说明")
-    direction = Column(String(8), default="input", comment="方向: input/output")
+    is_input = Column(Boolean, default=False, comment="是否为输入参数")
+    is_output = Column(Boolean, default=False, comment="是否为输出参数")
+    direction = Column(String(8), default="input", comment="方向(兼容旧数据): input/output")
     is_required = Column(Boolean, default=False, comment="是否必填")
     default_value = Column(String(256), comment="默认值")
     created_at = Column(DateTime, server_default=func.now())

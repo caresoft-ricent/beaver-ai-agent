@@ -296,12 +296,11 @@ def convert_params(db: Session, entities: dict, skill: Skill = None) -> dict:
     if not entity_ids:
         return result
 
-    # 加载所有有 mapping_config 的输入属性
+    # 加载所有有 mapping_config 的属性
     props = (
         db.query(EntityProperty)
         .filter(
             EntityProperty.entity_id.in_(entity_ids),
-            EntityProperty.is_input == True,
             EntityProperty.mapping_config.isnot(None),
         )
         .all()
@@ -509,7 +508,7 @@ def check_slots(db: Session, skill: Skill, entities: dict) -> SlotResult:
             continue
         action_params = (
             db.query(ActionParameter)
-            .filter(ActionParameter.action_id == tool.action_id, ActionParameter.direction == "input")
+            .filter(ActionParameter.action_id == tool.action_id, ActionParameter.is_input == True)
             .all()
         )
         for ap in action_params:
