@@ -161,9 +161,13 @@ def normalize_status(value: str, domain: str = "", db: Session = None) -> str:
     return value
 
 
-def normalize_entities(entities: dict, message: str, db: Session = None) -> dict:
-    """对抽取的实体做归一化：日期短语→区间，中文状态→标准值"""
+def normalize_entities(entities: dict, message: str, db: Session = None, skill=None) -> dict:
+    """对抽取的实体做归一化：属性级normalization_config → 日期短语→区间 → 中文状态→标准值"""
     result = dict(entities)
+
+    # ── 属性级归一化: 从 EntityProperty.normalization_config 加载 ──
+    if db and skill:
+        result = _apply_property_normalization(db, skill, result)
 
     # 日期归一化
     if "date" in result or "日期" in message or any(
@@ -177,6 +181,74 @@ def normalize_entities(entities: dict, message: str, db: Session = None) -> dict
     for key in list(result.keys()):
         if "status" in key or "状态" in key:
             result[key] = normalize_status(str(result[key]), db=db)
+
+    return result
+
+
+def _apply_property_normalization(db: Session, skill, entities: dict) -> dict:
+    """根据 EntityProperty.normalization_config 做属性级归一化
+
+    normalization_config 格式:
+    {
+        "type": "synonym|enum|regex",
+        "rules": {"用户输入值": "标准值", ...}
+    }
+    """
+    result = dict(entities)
+
+    tools = (
+        db.query(SkillTool)
+        .filter(SkillTool.skill_id == skill.id)
+        .order_by(SkillTool.order_no)
+        .all()
+    )
+    entity_ids = {t.entity_id for t in tools if t.entity_id}
+    if not entity_ids:
+        return result
+
+    props = (
+        db.query(EntityProperty)
+        .filter(
+            EntityProperty.entity_id.in_(entity_ids),
+            EntityProperty.normalization_config.isnot(None),
+        )
+        .all()
+    )
+
+    for prop in props:
+        config = prop.normalization_config
+        if not isinstance(config, dict):
+            continue
+
+        param_name = prop.name
+        if param_name not in result:
+            continue
+
+        user_value = str(result[param_name]).strip()
+        if not user_value:
+            continue
+
+        norm_type = config.get("type", "synonym")
+        rules = config.get("rules", {})
+
+        if norm_type in ("synonym", "enum") and isinstance(rules, dict):
+            # 同义词/枚举映射: {"华东线": "east_line", ...}
+            if user_value in rules:
+                result[param_name] = rules[user_value]
+            else:
+                # 大小写无关匹配
+                for k, v in rules.items():
+                    if k.lower() == user_value.lower():
+                        result[param_name] = v
+                        break
+        elif norm_type == "regex" and isinstance(rules, dict):
+            for pattern, replacement in rules.items():
+                try:
+                    if re.search(pattern, user_value):
+                        result[param_name] = re.sub(pattern, replacement, user_value)
+                        break
+                except re.error:
+                    continue
 
     return result
 
@@ -512,14 +584,21 @@ def check_slots(db: Session, skill: Skill, entities: dict) -> SlotResult:
             .all()
         )
         for ap in action_params:
-            if ap.is_required and ap.name not in entities:
+            # value_type == "fixed" 的参数由系统自动填充，不需要用户提供
+            if ap.value_type == "fixed":
+                continue
+            # 使用语义属性名检查(与LLM抽取的key一致)
+            semantic_name = ap.source_property or ap.name
+            # 有默认值的参数视为已填充
+            has_value = semantic_name in entities or (ap.default_value is not None and ap.default_value != "")
+            if ap.is_required and not has_value:
                 missing_params.append({
-                    "name": ap.name,
-                    "title": ap.title or ap.name,
+                    "name": semantic_name,
+                    "title": ap.title or semantic_name,
                     "description": ap.param_description or "",
                 })
-            elif not ap.is_required and ap.name not in entities:
-                optional_missing.append({"name": ap.name, "title": ap.title or ap.name})
+            elif not ap.is_required and not has_value:
+                optional_missing.append({"name": semantic_name, "title": ap.title or semantic_name})
 
     if missing_params:
         result.complete = False

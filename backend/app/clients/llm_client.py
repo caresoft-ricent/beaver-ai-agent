@@ -70,7 +70,7 @@ def call_llm_for_intent(
 ) -> dict:
     """专门用于意图识别的LLM调用"""
     intents_desc = "\n".join([
-        f"- {i['code']}: {i['description']}"
+        f"- {i['code']}: {i['description']}" + (f"\n  提示: {i['intent_hint']}" if i.get('intent_hint') else "")
         for i in available_intents
     ])
 
@@ -135,9 +135,17 @@ def call_llm_for_entities(
     entity_definitions: [{"name": "line_name", "title": "产线名称", "type": "string", "required": true, "llm_description": ...}, ...]
     返回: {"entities": {"line_name": "A线", ...}, "tokens_used": 123}
     """
+    # 收集操作描述(去重)，为LLM提供操作语义上下文
+    action_descs = list({e.get('action_description', '') for e in entity_definitions if e.get('action_description')})
+    action_context = ""
+    if action_descs:
+        action_context = "\n操作说明：" + "；".join(action_descs)
+
     entities_desc = "\n".join([
         f"- {e['name']}({e.get('title', e['name'])}): 类型={e.get('type', 'string')}, "
-        f"{'必填' if e.get('required') else '选填'}, {e.get('llm_description') or e.get('description', '')}"
+        f"{'必填' if e.get('required') else '选填'}"
+        f"{', 默认值=' + e['default_value'] if e.get('default_value') else ''}"
+        f", {e.get('llm_description') or e.get('description', '')}"
         for e in entity_definitions
     ])
 
@@ -159,7 +167,7 @@ def call_llm_for_entities(
     else:
         system_prompt = f"""你是一个实体抽取助手。请从用户输入中提取以下参数。
 
-当前意图: {intent_code}
+当前意图: {intent_code}{action_context}
 需要提取的参数:
 {entities_desc}
 {known_str}{context_str}
@@ -168,7 +176,8 @@ def call_llm_for_entities(
 1. 只提取用户明确提到或可推断的参数
 2. 日期类参数统一转为 YYYY-MM-DD 格式
 3. 如果参数无法从输入中确定，不要凭空猜测
-4. 返回严格JSON格式: {{"entities": {{"param_name": "value", ...}}}}"""
+4. 有默认值的参数如果用户未提及可不提取
+5. 返回严格JSON格式: {{"entities": {{"param_name": "value", ...}}}}"""
 
     result = call_llm(
         provider=provider,

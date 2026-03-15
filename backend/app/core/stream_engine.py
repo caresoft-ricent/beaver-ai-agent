@@ -180,8 +180,8 @@ async def _stream_dialog_inner(
         entities = merge_entities(entities, llm_entities)
         evidence.add_step("llm_entity_extraction", {"extracted": llm_entities})
 
-    # 参数归一化 (日期、枚举等)
-    entities = normalize_entities(entities, message, db=db)
+    # 参数归一化 (日期、枚举等 + 属性级normalization_config)
+    entities = normalize_entities(entities, message, db=db, skill=matched_skill)
     evidence.add_step("normalize_entities", {"normalized": entities})
 
     # 参数转换 (名称->ID等)
@@ -387,7 +387,8 @@ def _recognize_intent(db: Session, tenant_id: int, message: str,
     llm_config = _get_llm_config(db, tenant_id, "intent")
     if llm_config:
         available_intents = [
-            {"code": s.skill_code, "description": s.skill_description or s.skill_name}
+            {"code": s.skill_code, "description": s.skill_description or s.skill_name,
+             "intent_hint": s.intent_prompt or ""}
             for s in skills
         ]
         # 合并上下文摘要
@@ -497,25 +498,86 @@ def _get_entity_definitions(db: Session, skill: Skill) -> list:
             continue
 
         if tool.action_id:
+            # 加载操作描述，为LLM提供操作语义上下文
+            action_obj = db.query(Action).filter(Action.id == tool.action_id).first()
+            action_desc = action_obj.action_description if action_obj else ""
+
             action_params = (
                 db.query(ActionParameter)
                 .filter(ActionParameter.action_id == tool.action_id, ActionParameter.is_input == True)
                 .all()
             )
             for ap in action_params:
-                if ap.name not in seen:
-                    seen.add(ap.name)
-                    ep = ep_map.get((tool.entity_id, ap.name)) if tool.entity_id else None
+                # value_type == "fixed" 的参数由系统自动填充，不需要LLM抽取
+                if ap.value_type == "fixed":
+                    continue
+                # 使用语义属性名(source_property)作为抽取key
+                semantic_name = ap.source_property or ap.name
+                if semantic_name not in seen:
+                    seen.add(semantic_name)
+                    # 查找EntityProperty: 优先用语义名，回退到API参数名
+                    ep = None
+                    if tool.entity_id:
+                        ep = ep_map.get((tool.entity_id, semantic_name))
+                        if not ep:
+                            ep = ep_map.get((tool.entity_id, ap.name))
                     defs.append({
-                        "name": ap.name,
-                        "title": ap.title or ap.name,
+                        "name": semantic_name,
+                        "title": ap.title or semantic_name,
                         "type": ap.type,
-                        "required": ap.is_required,
+                        "required": ap.is_required and not ap.default_value,
                         "description": ap.param_description or "",
                         "llm_description": ep.llm_description if ep and ep.llm_description else "",
                         "extract_expression": ep.extract_expression if ep and ep.extract_expression else "",
+                        "default_value": ap.default_value or "",
+                        "action_description": action_desc or "",
                     })
     return defs
+
+
+def _apply_output_aggregation(db: Session, action_id: int, result: dict) -> dict:
+    """对 API 返回结果应用输出参数的 value_type 聚合处理(count/sum)"""
+    output_params = (
+        db.query(ActionParameter)
+        .filter(ActionParameter.action_id == action_id, ActionParameter.is_output == True)
+        .all()
+    )
+    agg_params = [ap for ap in output_params if ap.value_type in ("count", "sum")]
+    if not agg_params:
+        return result
+
+    # 提取数据列表
+    raw_data = result.get("data", {})
+    items = None
+    if isinstance(raw_data, dict):
+        inner = raw_data.get("data", raw_data)
+        if isinstance(inner, dict):
+            items = inner.get("items")
+        elif isinstance(inner, list):
+            items = inner
+    elif isinstance(raw_data, list):
+        items = raw_data
+
+    if not isinstance(items, list):
+        return result
+
+    aggregated = {}
+    for ap in agg_params:
+        field_name = ap.source_property or ap.name
+        if ap.value_type == "count":
+            aggregated[field_name] = len(items)
+        elif ap.value_type == "sum":
+            total = sum(
+                float(item.get(field_name, 0))
+                for item in items
+                if isinstance(item, dict) and item.get(field_name) is not None
+            )
+            aggregated[field_name] = total
+
+    if aggregated:
+        result["aggregated"] = aggregated
+
+    return result
 
 
 def _build_param_mapping(db: Session, action_id: int) -> Optional[dict]:
@@ -614,6 +676,22 @@ def _execute_tool_with_events(
     events.append(agui.tool_call_start(tc_id, tool_name))
 
     params = {**entities, "customer_id": customer_id}
+
+    # 应用 value_type 和 default_value 处理
+    input_params = (
+        db.query(ActionParameter)
+        .filter(ActionParameter.action_id == action.id, ActionParameter.is_input == True)
+        .all()
+    )
+    for ap in input_params:
+        semantic_name = ap.source_property or ap.name
+        if ap.value_type == "fixed" and ap.default_value is not None:
+            # fixed类型: 直接使用默认值，忽略用户输入
+            params[semantic_name] = ap.default_value
+        elif ap.default_value is not None and ap.default_value != "" and semantic_name not in params:
+            # 有默认值但用户未提供: 使用默认值填充
+            params[semantic_name] = ap.default_value
+
     events.append(agui.tool_call_args(tc_id, json.dumps(params, ensure_ascii=False)))
     events.append(agui.tool_call_end(tc_id))
 
@@ -654,6 +732,8 @@ def _execute_tool_with_events(
             mock_response=action.mock_response,
             param_mapping=param_mapping,
         )
+        # 应用输出参数的 value_type 聚合处理(count/sum)
+        result = _apply_output_aggregation(db, action.id, result)
         events.append(agui.tool_call_result(
             tc_id, json.dumps(result, ensure_ascii=False, default=str)
         ))
