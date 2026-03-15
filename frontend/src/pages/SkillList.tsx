@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Table, Button, Modal, Form, Input, Select, message, Space, Tag, Popconfirm,
   Alert, Card, Descriptions, Collapse, InputNumber, Typography, Divider, Empty,
@@ -13,7 +14,6 @@ import {
   getSkillTools, createSkillTool, deleteSkillTool,
   getEntities, getActions, getLLMConfigs,
 } from '../api/admin';
-import WorkflowEditor from '../components/WorkflowEditor';
 
 const { Text } = Typography;
 
@@ -54,6 +54,7 @@ interface EntityItem { id: number; entity_code: string; entity_name: string; }
 interface ActionItem { id: number; action_code: string; action_name: string; }
 
 export default function SkillList() {
+  const navigate = useNavigate();
   const [data, setData] = useState<Skill[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -259,9 +260,15 @@ export default function SkillList() {
       title: '操作', width: 280,
       render: (_: unknown, record: Skill) => (
         <Space>
-          <Button size="small" icon={<LinkOutlined />} onClick={() => openToolChain(record.id)}>
-            {record.flow_type === 'workflow' ? '编排' : '工具链'}
-          </Button>
+          {record.flow_type === 'workflow' ? (
+            <Button size="small" icon={<ApartmentOutlined />} onClick={() => navigate(`/intents/${record.id}/workflow`)}>
+              编排
+            </Button>
+          ) : (
+            <Button size="small" icon={<LinkOutlined />} onClick={() => openToolChain(record.id)}>
+              工具链
+            </Button>
+          )}
           <Button size="small" onClick={() => openEdit(record)}>编辑</Button>
           <Popconfirm title="确认删除?" okText="确认" cancelText="取消" onConfirm={() => deleteSkill(record.id).then(load)}>
             <Button size="small" danger>删除</Button>
@@ -334,7 +341,7 @@ export default function SkillList() {
 
       {/* 新建/编辑技能 Modal */}
       <Modal title={editingId ? '编辑技能' : '新建技能'} open={modalOpen} onOk={handleSubmit} onCancel={() => { setModalOpen(false); setFlowType('simple'); setWorkflowConfig(null); }}
-        width={flowType === 'workflow' ? 960 : 680} destroyOnClose
+        width={680} destroyOnClose
         okText="确认" cancelText="取消">
         <Form form={form} layout="vertical" initialValues={{ tenant_id: 1, sort_order: 0 }}>
           <Form.Item name="tenant_id" hidden><Input /></Form.Item>
@@ -367,18 +374,17 @@ export default function SkillList() {
               ]} />
           </Form.Item>
 
-          {flowType === 'workflow' && (
-            <Form.Item label="流程编排" tooltip="拖拽节点、连线编排复杂业务流程">
-              <WorkflowEditor
-                value={workflowConfig as any}
-                onChange={cfg => setWorkflowConfig(cfg as any)}
-                entities={entityOptions}
-                onLoadActions={async (entityId) => {
-                  const res = await getActions(entityId);
-                  return res.data.data || [];
-                }}
-              />
-            </Form.Item>
+          {flowType === 'workflow' && editingId && (
+            <Alert type="info" showIcon style={{ marginBottom: 16 }}
+              message="编排模式已开启"
+              description="保存技能后，点击列表中的「编排」按钮进入全屏流程编排器配置流程。"
+            />
+          )}
+          {flowType === 'workflow' && !editingId && (
+            <Alert type="info" showIcon style={{ marginBottom: 16 }}
+              message="编排模式"
+              description="请先保存技能，然后在列表中点击「编排」按钮进入全屏流程编排器。"
+            />
           )}
 
           <Form.Item name="skill_description" label="描述" tooltip="帮助 AI 理解何时触发此技能">

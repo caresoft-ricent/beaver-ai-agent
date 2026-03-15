@@ -13,6 +13,7 @@ import ChatPage from './pages/ChatPage';
 import ChatEmbed from './pages/ChatEmbed';
 import LogsPage from './pages/LogsPage';
 import NormalizationPage from './pages/NormalizationPage';
+import WorkflowPage from './pages/WorkflowPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('token');
@@ -27,6 +28,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/chat-embed" element={<ChatEmbed />} />
+          <Route path="/intents/:id/workflow" element={<ProtectedRoute><WorkflowPage /></ProtectedRoute>} />
           <Route path="/" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
             <Route index element={<Dashboard />} />
             <Route path="tenants" element={<TenantList />} />

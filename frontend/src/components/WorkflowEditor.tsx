@@ -77,6 +77,8 @@ interface WorkflowEditorProps {
   onChange?: (config: WorkflowConfig) => void;
   entities: EntityItem[];
   onLoadActions: (entityId: number) => Promise<ActionItem[]>;
+  /** 全屏模式：填满父容器高度 */
+  fullPage?: boolean;
 }
 
 // ── 节点类型配置 ──
@@ -128,7 +130,7 @@ const customNodeTypes = { workflow: WorkflowNode };
 
 // ── 主组件 ──
 
-export default function WorkflowEditor({ value, onChange, entities, onLoadActions }: WorkflowEditorProps) {
+export default function WorkflowEditor({ value, onChange, entities, onLoadActions, fullPage }: WorkflowEditorProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -358,9 +360,9 @@ export default function WorkflowEditor({ value, onChange, entities, onLoadAction
   const selectedConfig = selectedNodeId ? nodeConfigs[selectedNodeId] : null;
 
   return (
-    <div style={{ display: 'flex', height: 520, border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: fullPage ? '100%' : 520, border: fullPage ? 'none' : '1px solid #f0f0f0', borderRadius: fullPage ? 0 : 8, overflow: 'hidden' }}>
       {/* 左侧: 节点面板 */}
-      <div style={{ width: 160, background: '#fafafa', borderRight: '1px solid #f0f0f0', padding: 8, overflowY: 'auto' }}>
+      <div style={{ width: fullPage ? 180 : 160, background: '#fafafa', borderRight: '1px solid #f0f0f0', padding: fullPage ? 12 : 8, overflowY: 'auto' }}>
         <Text strong style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>添加节点</Text>
         {NODE_TYPES_META.map(meta => (
           <Tooltip key={meta.type} title={meta.desc} placement="right">
@@ -383,8 +385,10 @@ export default function WorkflowEditor({ value, onChange, entities, onLoadAction
       {/* 中间: 画布 */}
       <div style={{ flex: 1 }}>
         {nodes.length === 0 ? (
-          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Empty description="从左侧添加节点开始编排" />
+          <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
+            <Empty description={false} />
+            <Text type="secondary" style={{ fontSize: 15 }}>从左侧面板点击按钮添加第一个节点</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>添加节点后，拖拽连接点建立流程连线</Text>
           </div>
         ) : (
           <ReactFlow
@@ -410,7 +414,7 @@ export default function WorkflowEditor({ value, onChange, entities, onLoadAction
       </div>
 
       {/* 右侧: 属性面板 */}
-      <div style={{ width: 260, background: '#fafafa', borderLeft: '1px solid #f0f0f0', padding: 12, overflowY: 'auto' }}>
+      <div style={{ width: fullPage ? 300 : 260, background: '#fafafa', borderLeft: '1px solid #f0f0f0', padding: 12, overflowY: 'auto' }}>
         {selectedConfig ? (
           <NodePropertyPanel
             config={selectedConfig}
