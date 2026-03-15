@@ -31,6 +31,12 @@ class ConnectorClient:
             token = self.auth_config.get("token", "")
             if token:
                 headers["Authorization"] = f"Bearer {token}"
+        elif self.auth_type == "proxy_headers":
+            # 代理模式: 将 auth_config.headers 中所有键值对注入请求头
+            proxy_headers = self.auth_config.get("headers") or {}
+            for k, v in proxy_headers.items():
+                if k and v:
+                    headers[k] = str(v)
         return headers
 
     def call_action(

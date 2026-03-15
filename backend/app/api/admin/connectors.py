@@ -85,11 +85,15 @@ def test_connector(connector_id: int, db: Session = Depends(get_db)):
         test_url += "/" + conn.health_check_path.lstrip("/")
 
     try:
-        headers = {}
-        if conn.auth_type == "api_key" and conn.auth_config:
-            key_name = conn.auth_config.get("header_name", "Authorization")
-            key_value = conn.auth_config.get("key_value", "")
-            headers[key_name] = key_value
+        from app.clients.connector_client import ConnectorClient
+        cli = ConnectorClient({
+            "base_url": conn.base_url,
+            "auth_type": conn.auth_type,
+            "auth_config": conn.auth_config,
+            "timeout": conn.timeout,
+            "mock_enabled": "0",
+        })
+        headers = cli._build_headers()
         with httpx.Client(timeout=conn.timeout) as client:
             resp = client.get(test_url, headers=headers)
             return ResponseBase(data={

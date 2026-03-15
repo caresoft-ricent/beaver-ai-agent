@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Table, Button, Modal, Form, Input, Select, Switch, message, Space, Tag, Popconfirm } from 'antd';
+import { Table, Button, Modal, Form, Input, Select, Switch, message, Space, Tag, Popconfirm, Alert } from 'antd';
 import { PlusOutlined, PlayCircleOutlined, SearchOutlined } from '@ant-design/icons';
 import { getConnectors, createConnector, updateConnector, deleteConnector, testConnector } from '../api/admin';
 
@@ -43,10 +43,19 @@ export default function ConnectorList() {
   const handleSubmit = async () => {
     const values = await form.validateFields();
     // 将 auth header/key 组装成 auth_config
-    const { auth_header_name, auth_key_value, mock_switch, _status_switch, ...rest } = values;
+    const { auth_header_name, auth_key_value, mock_switch, _status_switch, proxy_headers_json, ...rest } = values;
     rest.mock_enabled = mock_switch ? '1' : '0';
     rest.status = _status_switch ? 'active' : 'inactive';
-    if (auth_header_name || auth_key_value) {
+    if (rest.auth_type === 'proxy_headers') {
+      // 代理模式: 将 JSON 文本解析为 headers 对象
+      try {
+        const headers = JSON.parse(proxy_headers_json || '{}');
+        rest.auth_config = { headers };
+      } catch {
+        message.error('代理请求头 JSON 格式不正确');
+        return;
+      }
+    } else if (auth_header_name || auth_key_value) {
       rest.auth_config = {
         header_name: auth_header_name || 'Authorization',
         key_value: auth_key_value || '',
@@ -69,10 +78,14 @@ export default function ConnectorList() {
     setEditingId(record.id);
     const formData: Record<string, unknown> = { ...record, mock_switch: record.mock_enabled === '1', _status_switch: record.status === 'active' };
     // 解析 auth_config 到表单字段
-    const authConfig = (record as Record<string, unknown>).auth_config as Record<string, string> | undefined;
+    const authConfig = (record as Record<string, unknown>).auth_config as Record<string, unknown> | undefined;
     if (authConfig) {
-      formData.auth_header_name = authConfig.header_name;
-      formData.auth_key_value = authConfig.key_value;
+      if (record.auth_type === 'proxy_headers') {
+        formData.proxy_headers_json = JSON.stringify(authConfig.headers || {}, null, 2);
+      } else {
+        formData.auth_header_name = authConfig.header_name;
+        formData.auth_key_value = authConfig.key_value;
+      }
     }
     form.setFieldsValue(formData);
     setModalOpen(true);
@@ -94,6 +107,9 @@ export default function ConnectorList() {
     }
   };
 
+  // 监听 auth_type 变化
+  const authType = Form.useWatch('auth_type', form);
+
   return (
     <>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -111,7 +127,7 @@ export default function ConnectorList() {
         { title: '名称', dataIndex: 'name' },
         { title: '类型', dataIndex: 'type', render: (t: string) => <Tag color="blue">{t === 'beaver_cloud' ? '河狸云' : t}</Tag> },
         { title: 'Base URL', dataIndex: 'base_url', ellipsis: true },
-        { title: '认证', dataIndex: 'auth_type' },
+        { title: '认证', dataIndex: 'auth_type', render: (t: string) => t === 'proxy_headers' ? <Tag color="purple">代理请求头</Tag> : t },
         {
           title: 'Mock', dataIndex: 'mock_enabled',
           render: (v: string) => v === '1' ? <Tag color="orange">Mock</Tag> : <Tag color="green">真实</Tag>,
@@ -161,14 +177,30 @@ export default function ConnectorList() {
               { value: 'api_key', label: 'API Key' },
               { value: 'oauth2', label: 'OAuth2' },
               { value: 'jwt_pass', label: 'JWT Token' },
+              { value: 'proxy_headers', label: '代理请求头(模拟账户)' },
             ]} />
           </Form.Item>
-          <Form.Item name="auth_header_name" label="认证 Header 名">
-            <Input placeholder="Authorization" />
-          </Form.Item>
-          <Form.Item name="auth_key_value" label="认证 Key / Token">
-            <Input.Password placeholder="Bearer your-api-key-here" />
-          </Form.Item>
+          {authType === 'proxy_headers' ? (
+            <>
+              <Alert type="info" showIcon style={{ marginBottom: 16 }}
+                message="代理模式：将以下 JSON 中的所有键值对作为请求头注入每次 API 调用，用于模拟特定账户身份。" />
+              <Form.Item name="proxy_headers_json" label="请求头 JSON"
+                rules={[{ required: true, message: '请输入请求头 JSON' }, {
+                  validator: (_, v) => { try { JSON.parse(v || '{}'); return Promise.resolve(); } catch { return Promise.reject('JSON 格式不正确'); } },
+                }]}>
+                <Input.TextArea rows={10} placeholder='{"authorization": "Bearer xxx", "tenantid": "KSDWG", ...}' style={{ fontFamily: 'monospace', fontSize: 12 }} />
+              </Form.Item>
+            </>
+          ) : (
+            <>
+              <Form.Item name="auth_header_name" label="认证 Header 名">
+                <Input placeholder="Authorization" />
+              </Form.Item>
+              <Form.Item name="auth_key_value" label="认证 Key / Token">
+                <Input.Password placeholder="Bearer your-api-key-here" />
+              </Form.Item>
+            </>
+          )}
           <Form.Item name="health_check_path" label="健康检查路径">
             <Input placeholder="health（可选，用于连接测试）" />
           </Form.Item>
