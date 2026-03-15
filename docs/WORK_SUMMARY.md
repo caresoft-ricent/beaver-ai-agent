@@ -193,8 +193,8 @@ RUN_FINISHED
 | ai_entity | Entity | 业务本体 | tenant_id, entity_code, entity_name, connector_id, status |
 | ai_entity_property | EntityProperty | 本体属性 | entity_id, name, type, is_input, is_output |
 | ai_entity_relation | EntityRelation | 本体关系 | entity_id_a, entity_id_b, relation_type |
-| ai_action | Action | 本体操作 | entity_id, action_code, http_method, api_path |
-| ai_action_parameter | ActionParameter | 操作参数 | action_id, param_name, param_type |
+| ai_action | Action | 操作(可独立/可绑本体) | tenant_id, entity_id(可空), connector_id, action_code, http_method, api_path, category, tags |
+| ai_action_parameter | ActionParameter | 操作参数 | action_id, name, source_property, type, direction |
 | ai_skill | Skill | 技能/意图 | tenant_id, skill_code, skill_name, match_keywords, workflow_config |
 | ai_skill_tool | SkillTool | 技能工具关联 | skill_id, entity_id, action_id, tools_mode, config |
 | ai_chat_session | ChatSession | 对话会话 | session_id, tenant_id, customer_id, message_count |
@@ -227,7 +227,12 @@ RUN_FINISHED
 | | GET/PUT/DELETE | `/ontologies/entities/{id}` | 详情 / 更新 / 删除 |
 | | POST | `/ontologies/entities/{id}/publish` | 发布实体 |
 | | CRUD | 属性 & 关系端点 | 属性管理、关系管理 |
-| | GET/POST | `/ontologies/entities/{id}/actions` | 操作列表 / 创建 |
+| | GET/POST | `/ontologies/entities/{id}/actions` | 本体下操作列表 / 创建 |
+| 操作 | GET | `/ontologies/actions` | 全局操作列表(支持tenant_id/entity_id/category/keyword筛选) |
+| | POST | `/ontologies/actions` | 创建独立操作(无需绑定本体) |
+| | GET | `/ontologies/actions/{id}` | 操作详情(含参数列表) |
+| | PUT | `/ontologies/actions/{id}` | 更新操作 |
+| | DELETE | `/ontologies/actions/{id}` | 删除操作(级联删除参数) |
 | | GET/POST | `/ontologies/actions/{id}/parameters` | 参数列表 / 创建 |
 | | GET/POST | `/ontologies/base-properties` | 基础属性列表 / 创建 |
 | 技能 | GET/POST | `/intents` | 技能列表 / 创建 |
@@ -402,7 +407,56 @@ alembic upgrade head
 
 ---
 
-## 九、后续规划
+## 九、本体/操作解耦架构
+
+### 9.1 设计思路
+
+原始设计中，操作（Action）必须绑定到本体（Entity），即 `Action.entity_id` 为 NOT NULL。这导致：
+- 同一个 API 概念（如"产线"）在不同接口中使用不同参数名（如 `regionId`、`stageId`），需要重复配置
+- 操作无法跨本体复用
+- 新增 API 对接时配置工作量大
+
+### 9.2 解耦后的架构
+
+```
+语义层 (EntityProperty)     映射层 (ActionParameter)     API层
+┌─────────────┐           ┌──────────────────┐        ┌──────────┐
+│ line_code   │──────────→│ source: line_code │──映射──→│ regionId │  (API-A)
+│ (产线编号)   │           │ name:   regionId  │        └──────────┘
+│             │           ├──────────────────┤        ┌──────────┐
+│             │──────────→│ source: line_code │──映射──→│ stageId  │  (API-B)
+│             │           │ name:   stageId   │        └──────────┘
+└─────────────┘           └──────────────────┘
+```
+
+### 9.3 关键变更
+
+| 变更项 | 说明 |
+|--------|------|
+| `Action.entity_id` | 改为可空（NULL = 独立操作） |
+| `Action.tenant_id` | 新增，操作可独立归属租户 |
+| `Action.connector_id` | 新增，操作可直接关联连接器（不依赖本体） |
+| `Action.category / tags` | 新增，便于分类搜索管理 |
+| `ActionParameter.source_property` | **核心新增**：来源属性名，指定从上下文哪个字段取值 |
+| `ConnectorClient.param_mapping` | 新增参数映射能力，自动将语义字段名转为 API 参数名 |
+| 三大引擎 | 支持从操作自身的 `connector_id` 获取连接器，`_build_param_mapping()` 构建映射 |
+| Admin API | 新增 `GET/POST /actions`（独立操作 CRUD）、`GET/PUT /actions/{id}` |
+
+### 9.4 配置示例
+
+以"产线进度查询"为例，API-A 需要 `regionId`，API-B 需要 `stageId`，但语义上都是"产线编号"：
+
+```json
+// ActionParameter 配置
+{ "name": "regionId", "source_property": "line_code", "type": "string", "direction": "input" }
+{ "name": "stageId",  "source_property": "line_code", "type": "string", "direction": "input" }
+```
+
+引擎执行时自动将上下文中的 `line_code` 映射为 `regionId` 或 `stageId` 发送给对应 API。
+
+---
+
+## 十、后续规划
 
 | 优先级 | 任务 | 说明 |
 |--------|------|------|

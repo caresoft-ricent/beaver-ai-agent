@@ -46,7 +46,7 @@ interface PropertyItem {
   normalization_config?: Record<string, unknown>;
   mapping_config?: Record<string, unknown>;
 }
-interface ActionItem { id: number; entity_id: number; action_code: string; action_name: string; http_method: string; api_path?: string; }
+interface ActionItem { id: number; entity_id?: number; tenant_id: number; connector_id?: number; action_code: string; action_name: string; action_description?: string; category?: string; http_method: string; api_path?: string; }
 
 const modeIcon: Record<string, React.ReactNode> = {
   api: <ApiOutlined />,

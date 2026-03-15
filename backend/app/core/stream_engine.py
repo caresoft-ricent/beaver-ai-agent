@@ -518,6 +518,20 @@ def _get_entity_definitions(db: Session, skill: Skill) -> list:
     return defs
 
 
+def _build_param_mapping(db: Session, action_id: int) -> Optional[dict]:
+    """从ActionParameter构建参数名映射 {api_param_name: source_property_name}"""
+    action_params = (
+        db.query(ActionParameter)
+        .filter(ActionParameter.action_id == action_id, ActionParameter.direction == "input")
+        .all()
+    )
+    mapping = {}
+    for ap in action_params:
+        if ap.source_property and ap.source_property != ap.name:
+            mapping[ap.name] = ap.source_property
+    return mapping if mapping else None
+
+
 def _execute_tool_with_events(
     db: Session, tool: SkillTool, entities: dict, customer_id: str,
     evidence: EvidenceCollector = None,
@@ -585,29 +599,29 @@ def _execute_tool_with_events(
             return {"events": events, "data": None}
 
     # 回退: entity+action 方式
-    if not tool.entity_id:
-        return {"events": [], "data": None}
-
-    entity = db.query(Entity).filter(Entity.id == tool.entity_id).first()
-    if not entity:
-        return {"events": [], "data": None}
-
+    action = None
+    entity = None
     if tool.action_id:
         action = db.query(Action).filter(Action.id == tool.action_id).first()
-    else:
+    if tool.entity_id:
+        entity = db.query(Entity).filter(Entity.id == tool.entity_id).first()
+    if not action and entity:
         action = db.query(Action).filter(Action.entity_id == entity.id).first()
     if not action:
         return {"events": [], "data": None}
 
-    tool_name = f"{entity.entity_code}.{action.action_code}"
+    tool_name = f"{entity.entity_code}.{action.action_code}" if entity else action.action_code
     events.append(agui.tool_call_start(tc_id, tool_name))
 
     params = {**entities, "customer_id": customer_id}
     events.append(agui.tool_call_args(tc_id, json.dumps(params, ensure_ascii=False)))
     events.append(agui.tool_call_end(tc_id))
 
+    # 获取连接器 — 优先从操作自身, 其次从本体
     connector = None
-    if entity.connector_id:
+    if action.connector_id:
+        connector = db.query(Connector).filter(Connector.id == action.connector_id).first()
+    if not connector and entity and entity.connector_id:
         connector = db.query(Connector).filter(Connector.id == entity.connector_id).first()
 
     if not connector:
@@ -616,6 +630,9 @@ def _execute_tool_with_events(
             events.append(agui.tool_call_result(tc_id, json.dumps(data, ensure_ascii=False)))
             return {"events": events, "data": data}
         return {"events": events, "data": None}
+
+    # 构建参数映射
+    param_mapping = _build_param_mapping(db, action.id)
 
     cli = ConnectorClient({
         "base_url": connector.base_url,
@@ -635,6 +652,7 @@ def _execute_tool_with_events(
             },
             params=params,
             mock_response=action.mock_response,
+            param_mapping=param_mapping,
         )
         events.append(agui.tool_call_result(
             tc_id, json.dumps(result, ensure_ascii=False, default=str)

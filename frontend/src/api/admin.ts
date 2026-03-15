@@ -111,8 +111,20 @@ export const deleteSkillTool = (toolId: number) =>
 export const getActions = (entityId: number) =>
   client.get(`/admin/ontologies/entities/${entityId}/actions`);
 
+export const getAllActions = (params?: Record<string, unknown>) =>
+  client.get('/admin/ontologies/actions', { params });
+
+export const getAction = (actionId: number) =>
+  client.get(`/admin/ontologies/actions/${actionId}`);
+
 export const createAction = (entityId: number, data: Record<string, unknown>) =>
   client.post(`/admin/ontologies/entities/${entityId}/actions`, data);
+
+export const createStandaloneAction = (data: Record<string, unknown>) =>
+  client.post('/admin/ontologies/actions', data);
+
+export const updateAction = (actionId: number, data: Record<string, unknown>) =>
+  client.put(`/admin/ontologies/actions/${actionId}`, data);
 
 export const deleteAction = (actionId: number) =>
   client.delete(`/admin/ontologies/actions/${actionId}`);

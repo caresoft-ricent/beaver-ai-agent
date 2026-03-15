@@ -134,10 +134,14 @@ class BasePropertyOut(BaseModel):
 
 # ===== Action =====
 class ActionCreate(BaseModel):
-    entity_id: int
+    tenant_id: int
+    entity_id: Optional[int] = None
+    connector_id: Optional[int] = None
     action_code: str
     action_name: str
     action_description: Optional[str] = None
+    category: Optional[str] = ""
+    tags: Optional[list] = None
     http_method: str = "GET"
     api_path: Optional[str] = None
     request_template: Optional[dict] = None
@@ -146,15 +150,38 @@ class ActionCreate(BaseModel):
     mock_response: Optional[dict] = None
 
 
+class ActionUpdate(BaseModel):
+    entity_id: Optional[int] = None
+    connector_id: Optional[int] = None
+    action_code: Optional[str] = None
+    action_name: Optional[str] = None
+    action_description: Optional[str] = None
+    category: Optional[str] = None
+    tags: Optional[list] = None
+    http_method: Optional[str] = None
+    api_path: Optional[str] = None
+    request_template: Optional[dict] = None
+    response_mapping: Optional[dict] = None
+    cache_ttl: Optional[int] = None
+    mock_response: Optional[dict] = None
+
+
 class ActionOut(BaseModel):
     id: int
-    entity_id: int
+    tenant_id: int
+    entity_id: Optional[int]
+    connector_id: Optional[int]
     action_code: str
     action_name: str
     action_description: Optional[str]
+    category: Optional[str] = ""
+    tags: Optional[list] = None
     http_method: str
     api_path: Optional[str]
+    request_template: Optional[dict] = None
+    response_mapping: Optional[dict] = None
     cache_ttl: int
+    mock_response: Optional[dict] = None
     created_at: Optional[datetime]
 
     model_config = {"from_attributes": True}
@@ -164,6 +191,7 @@ class ActionParameterCreate(BaseModel):
     action_id: int
     property_id: Optional[int] = None
     name: str
+    source_property: Optional[str] = None
     type: str
     title: Optional[str] = None
     param_description: Optional[str] = None
@@ -177,6 +205,7 @@ class ActionParameterOut(BaseModel):
     action_id: int
     property_id: Optional[int]
     name: str
+    source_property: Optional[str]
     type: str
     title: Optional[str]
     direction: str

@@ -241,30 +241,33 @@ class DialogEngine:
                 return {"data": mock, "source": "mock_fallback"} if mock else None
 
         # ── 模式2: 本体+操作(entity+action) ──
-        entity = self.db.query(Entity).filter(Entity.id == tool.entity_id).first() if tool.entity_id else None
-        if not entity:
-            return None
-
-        # 获取操作
+        # 查找操作 — 优先通过action_id直接定位
+        action = None
+        entity = None
         if tool.action_id:
             action = self.db.query(Action).filter(Action.id == tool.action_id).first()
-        else:
-            # 取本体下第一个操作
+        if tool.entity_id:
+            entity = self.db.query(Entity).filter(Entity.id == tool.entity_id).first()
+        # 兼容: 只有entity_id没有action_id时，取本体下第一个操作
+        if not action and entity:
             action = self.db.query(Action).filter(Action.entity_id == entity.id).first()
-
         if not action:
             return None
 
-        # 获取连接器
+        # 获取连接器 — 优先从操作自身的connector_id取, 其次从本体取
         connector = None
-        if entity.connector_id:
+        if action.connector_id:
+            connector = self.db.query(Connector).filter(Connector.id == action.connector_id).first()
+        if not connector and entity and entity.connector_id:
             connector = self.db.query(Connector).filter(Connector.id == entity.connector_id).first()
 
         if not connector:
-            # 无连接器时返回mock数据
             if action.mock_response:
                 return {"data": action.mock_response, "source": "mock"}
             return None
+
+        # 构建参数映射 — 从ActionParameter的source_property获取
+        param_mapping = self._build_param_mapping(action.id)
 
         # 构建参数
         params = {**entities}
@@ -289,9 +292,27 @@ class DialogEngine:
                 },
                 params=params,
                 mock_response=action.mock_response,
+                param_mapping=param_mapping,
             )
         except Exception:
             return None
+
+    def _build_param_mapping(self, action_id: int) -> Optional[dict]:
+        """从ActionParameter构建参数名映射
+        
+        Returns: {api_param_name: source_property_name} 或 None
+        例如: {"regionId": "line_code", "stageId": "line_code"}
+        """
+        action_params = (
+            self.db.query(ActionParameter)
+            .filter(ActionParameter.action_id == action_id, ActionParameter.direction == "input")
+            .all()
+        )
+        mapping = {}
+        for ap in action_params:
+            if ap.source_property and ap.source_property != ap.name:
+                mapping[ap.name] = ap.source_property
+        return mapping if mapping else None
 
     def _render_template(self, template: str, data: dict, entities: dict) -> str:
         """渲染回答模板"""

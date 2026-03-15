@@ -43,7 +43,7 @@ from sqlalchemy.orm import Session
 
 from app.models.config import LLMConfig, Connector
 from app.models.ontology import Entity
-from app.models.action import Action
+from app.models.action import Action, ActionParameter
 from app.models.intent import Skill, SkillTool
 from app.clients.llm_client import call_llm
 from app.clients.connector_client import ConnectorClient
@@ -142,17 +142,14 @@ class WorkflowExecutor:
         action_id = node.get("action_id")
         node_id = node["id"]
 
-        if not entity_id:
-            return node.get("next")
-
-        entity = self.db.query(Entity).filter(Entity.id == entity_id).first()
-        if not entity:
-            return node.get("next")
-
+        # 查找操作 — 优先通过action_id直接定位
         action = None
+        entity = None
         if action_id:
             action = self.db.query(Action).filter(Action.id == action_id).first()
-        else:
+        if entity_id:
+            entity = self.db.query(Entity).filter(Entity.id == entity_id).first()
+        if not action and entity:
             action = self.db.query(Action).filter(Action.entity_id == entity.id).first()
         if not action:
             return node.get("next")
@@ -166,14 +163,20 @@ class WorkflowExecutor:
                 params[k] = self._resolve_value(v)
 
         tc_id = agui.new_id()
-        tool_name = f"{entity.entity_code}.{action.action_code}"
+        tool_name = f"{entity.entity_code}.{action.action_code}" if entity else action.action_code
         yield agui.tool_call_start(tc_id, tool_name)
         yield agui.tool_call_args(tc_id, json.dumps(params, ensure_ascii=False))
         yield agui.tool_call_end(tc_id)
 
+        # 获取连接器 — 优先从操作自身, 其次从本体
         connector = None
-        if entity.connector_id:
+        if action.connector_id:
+            connector = self.db.query(Connector).filter(Connector.id == action.connector_id).first()
+        if not connector and entity and entity.connector_id:
             connector = self.db.query(Connector).filter(Connector.id == entity.connector_id).first()
+
+        # 构建参数映射
+        param_mapping = self._build_param_mapping(action.id)
 
         result_data = None
         if connector:
@@ -194,6 +197,7 @@ class WorkflowExecutor:
                     },
                     params=params,
                     mock_response=action.mock_response,
+                    param_mapping=param_mapping,
                 )
                 result_data = result.get("data")
                 yield agui.tool_call_result(tc_id, json.dumps(result, ensure_ascii=False, default=str))
@@ -219,6 +223,19 @@ class WorkflowExecutor:
                     self.entities[target_key] = val
 
         return node.get("next")
+
+    def _build_param_mapping(self, action_id: int) -> Optional[dict]:
+        """从ActionParameter构建参数名映射 {api_param_name: source_property_name}"""
+        action_params = (
+            self.db.query(ActionParameter)
+            .filter(ActionParameter.action_id == action_id, ActionParameter.direction == "input")
+            .all()
+        )
+        mapping = {}
+        for ap in action_params:
+            if ap.source_property and ap.source_property != ap.name:
+                mapping[ap.name] = ap.source_property
+        return mapping if mapping else None
 
     def _handle_condition(self, node: dict) -> Optional[str]:
         """条件分支节点 — 根据字段值路由"""

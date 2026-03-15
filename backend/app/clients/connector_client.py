@@ -38,21 +38,28 @@ class ConnectorClient:
         action_config: dict,
         params: Optional[dict] = None,
         mock_response: Optional[dict] = None,
+        param_mapping: Optional[dict] = None,
     ) -> dict:
         """
         执行一个操作
         action_config: {http_method, api_path, request_template, response_mapping}
+        param_mapping: {api_param_name: source_property_name} 参数名映射
+                       例如 {"regionId": "line_code", "stageId": "line_code"}
+                       表示API需要regionId，从上下文的line_code字段取值
         """
         # Mock模式
         if self.mock_enabled and mock_response:
             return {"data": mock_response, "source": "mock"}
 
+        # 应用参数名映射: 将语义参数名转换为API实际参数名
+        mapped_params = self._apply_param_mapping(params, param_mapping)
+
         method = action_config.get("http_method", "GET").upper()
         path = action_config.get("api_path", "")
 
         # 替换路径中的变量 (如 /api/lines/{line_code})
-        if params:
-            for key, value in params.items():
+        if mapped_params:
+            for key, value in mapped_params.items():
                 path = path.replace(f"{{{key}}}", str(value))
 
         url = f"{self.base_url}/{path.lstrip('/')}"
@@ -62,16 +69,16 @@ class ConnectorClient:
         request_body = None
         if method in ("POST", "PUT", "PATCH"):
             template = action_config.get("request_template")
-            if template and params:
+            if template and mapped_params:
                 # 简单模板替换
-                request_body = self._apply_template(template, params)
+                request_body = self._apply_template(template, mapped_params)
             else:
-                request_body = params
+                request_body = mapped_params
 
         try:
             with httpx.Client(timeout=self.timeout) as client:
                 if method == "GET":
-                    resp = client.get(url, headers=headers, params=params)
+                    resp = client.get(url, headers=headers, params=mapped_params)
                 elif method == "POST":
                     resp = client.post(url, headers=headers, json=request_body)
                 elif method == "PUT":
@@ -101,6 +108,31 @@ class ConnectorClient:
             if mock_response:
                 return {"data": mock_response, "source": "mock_fallback", "error": str(e)}
             raise
+
+    def _apply_param_mapping(self, params: Optional[dict], param_mapping: Optional[dict]) -> Optional[dict]:
+        """应用参数名映射: 将语义参数名(如line_code)转换为API实际参数名(如regionId)
+        
+        param_mapping: {api_param_name: source_property_name}
+        例如 {"regionId": "line_code"} → 从params["line_code"]取值, 放入结果的["regionId"]
+        
+        未在mapping中的原始参数也会保留(透传)
+        """
+        if not params:
+            return params
+        if not param_mapping:
+            return params
+
+        mapped = {}
+        used_sources = set()
+        for api_name, source_name in param_mapping.items():
+            if source_name in params:
+                mapped[api_name] = params[source_name]
+                used_sources.add(source_name)
+        # 透传未映射的参数
+        for key, value in params.items():
+            if key not in used_sources and key not in mapped:
+                mapped[key] = value
+        return mapped
 
     def _apply_template(self, template: dict, params: dict) -> dict:
         """简单的JSON模板参数替换"""

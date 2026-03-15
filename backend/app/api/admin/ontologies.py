@@ -11,7 +11,7 @@ from app.schemas.ontology import (
     EntityPropertyCreate, EntityPropertyUpdate, EntityPropertyOut,
     EntityRelationCreate, EntityRelationOut,
     BasePropertyCreate, BasePropertyOut,
-    ActionCreate, ActionOut,
+    ActionCreate, ActionUpdate, ActionOut,
     ActionParameterCreate, ActionParameterOut,
 )
 from app.schemas.common import ResponseBase
@@ -178,18 +178,91 @@ def create_base_property(req: BasePropertyCreate, db: Session = Depends(get_db))
 
 
 # ===== Action CRUD =====
+
+# 独立操作列表(全局)
+@router.get("/actions")
+def list_all_actions(
+    tenant_id: Optional[int] = None,
+    entity_id: Optional[int] = None,
+    category: Optional[str] = None,
+    keyword: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
+    db: Session = Depends(get_db),
+):
+    query = db.query(Action)
+    if tenant_id:
+        query = query.filter(Action.tenant_id == tenant_id)
+    if entity_id:
+        query = query.filter(Action.entity_id == entity_id)
+    if category:
+        query = query.filter(Action.category == category)
+    if keyword:
+        query = query.filter(
+            (Action.action_name.contains(keyword)) | (Action.action_code.contains(keyword))
+        )
+    total = query.count()
+    items = query.order_by(Action.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    return ResponseBase(data={
+        "total": total,
+        "items": [ActionOut.model_validate(a).model_dump() for a in items],
+    })
+
+
+# 本体下的操作列表(兼容旧接口)
 @router.get("/entities/{entity_id}/actions")
 def list_actions(entity_id: int, db: Session = Depends(get_db)):
     items = db.query(Action).filter(Action.entity_id == entity_id).all()
     return ResponseBase(data=[ActionOut.model_validate(a).model_dump() for a in items])
 
 
+# 创建操作(独立)
+@router.post("/actions")
+def create_standalone_action(req: ActionCreate, db: Session = Depends(get_db)):
+    action = Action(**req.model_dump())
+    db.add(action)
+    db.commit()
+    db.refresh(action)
+    return ResponseBase(data=ActionOut.model_validate(action).model_dump())
+
+
+# 创建操作(本体下, 兼容旧接口)
 @router.post("/entities/{entity_id}/actions")
 def create_action(entity_id: int, req: ActionCreate, db: Session = Depends(get_db)):
     req_data = req.model_dump()
     req_data["entity_id"] = entity_id
+    # 从本体继承tenant_id
+    entity = db.query(Entity).filter(Entity.id == entity_id).first()
+    if entity:
+        req_data["tenant_id"] = entity.tenant_id
     action = Action(**req_data)
     db.add(action)
+    db.commit()
+    db.refresh(action)
+    return ResponseBase(data=ActionOut.model_validate(action).model_dump())
+
+
+# 获取操作详情
+@router.get("/actions/{action_id}")
+def get_action(action_id: int, db: Session = Depends(get_db)):
+    action = db.query(Action).filter(Action.id == action_id).first()
+    if not action:
+        raise HTTPException(status_code=404, detail="操作不存在")
+    data = ActionOut.model_validate(action).model_dump()
+    # 附带参数列表
+    params = db.query(ActionParameter).filter(ActionParameter.action_id == action_id).all()
+    data["parameters"] = [ActionParameterOut.model_validate(p).model_dump() for p in params]
+    return ResponseBase(data=data)
+
+
+# 更新操作
+@router.put("/actions/{action_id}")
+def update_action(action_id: int, req: ActionUpdate, db: Session = Depends(get_db)):
+    action = db.query(Action).filter(Action.id == action_id).first()
+    if not action:
+        raise HTTPException(status_code=404, detail="操作不存在")
+    for key, value in req.model_dump(exclude_unset=True).items():
+        setattr(action, key, value)
     db.commit()
     db.refresh(action)
     return ResponseBase(data=ActionOut.model_validate(action).model_dump())
