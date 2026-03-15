@@ -3,9 +3,10 @@
 提供:
 - EvidenceCollector: 在引擎流程中收集证据
 - 存入 ChatMessage.evidence_chain 和 ActionLog
-- 供管理后台查询分析
+- 同步输出到 Python logger，方便服务端日志查看全链路
 """
 import json
+import logging
 import time
 import traceback
 from typing import Optional, Any
@@ -13,9 +14,20 @@ from sqlalchemy.orm import Session
 
 from app.models.chat import ActionLog
 
+logger = logging.getLogger("beaver.evidence")
+
+
+def _safe_json(obj: Any, max_len: int = 2000) -> str:
+    """安全序列化为 JSON 字符串, 超长截断"""
+    try:
+        s = json.dumps(obj, ensure_ascii=False, default=str)
+        return s[:max_len] + "..." if len(s) > max_len else s
+    except Exception:
+        return str(obj)[:max_len]
+
 
 class EvidenceCollector:
-    """在一次对话处理中收集证据链"""
+    """在一次对话处理中收集证据链，并同步输出到 logger"""
 
     def __init__(self, session_id: str, tenant_id: int, customer_id: str):
         self.session_id = session_id
@@ -24,15 +36,17 @@ class EvidenceCollector:
         self.steps: list[dict] = []
         self.errors: list[dict] = []
         self.start_time = time.time()
+        logger.info("═══ 对话链路开始 ═══ session=%s customer=%s", session_id, customer_id)
 
     def add_step(self, step: str, detail: Any = None, duration_ms: int = 0):
-        """记录一个处理步骤"""
+        """记录一个处理步骤，同时输出到日志"""
         self.steps.append({
             "step": step,
             "detail": detail,
             "duration_ms": duration_ms,
             "timestamp": int(time.time() * 1000),
         })
+        logger.info("── [%s] %dms %s", step, duration_ms, _safe_json(detail))
 
     def add_error(self, step: str, error: str, traceback_str: str = ""):
         """记录一个错误"""
@@ -42,6 +56,7 @@ class EvidenceCollector:
             "traceback": traceback_str[:2000],
             "timestamp": int(time.time() * 1000),
         })
+        logger.error("── [ERROR:%s] %s", step, error)
 
     def to_dict(self) -> dict:
         """输出证据链字典"""
@@ -55,6 +70,9 @@ class EvidenceCollector:
     def save_action_log(self, db: Session, action_type: str, params: dict = None,
                         status: str = "success", result: dict = None, error_message: str = None):
         """写入 ActionLog 表"""
+        total_ms = int((time.time() - self.start_time) * 1000)
+        logger.info("═══ 对话链路结束 ═══ session=%s status=%s total=%dms steps=%d errors=%d",
+                     self.session_id, status, total_ms, len(self.steps), len(self.errors))
         log = ActionLog(
             session_id=self.session_id,
             tenant_id=self.tenant_id,

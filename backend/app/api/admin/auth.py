@@ -126,3 +126,19 @@ def change_password(
     user.password_hash = bcrypt.hash(req.new_password)
     db.commit()
     return ResponseBase(message="密码修改成功")
+
+
+@router.post("/reset-password")
+def reset_password(db: Session = Depends(get_db)):
+    """重置管理员密码为默认值 (仅开发/应急使用)
+
+    重置条件: 数据库中仅有一个管理员账户时可用
+    重置后密码: admin123
+    """
+    users = db.query(AdminUser).all()
+    if len(users) != 1:
+        raise HTTPException(status_code=403, detail="仅单管理员环境支持重置")
+    user = users[0]
+    user.password_hash = bcrypt.hash("admin123")
+    db.commit()
+    return ResponseBase(message=f"已重置用户 {user.username} 的密码为 admin123，请立即修改")

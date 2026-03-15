@@ -1,7 +1,10 @@
 """LLM统一客户端 - 支持多家大模型API"""
 import httpx
 import json
+import logging
 from typing import Optional
+
+logger = logging.getLogger("beaver.llm")
 
 
 def call_llm(
@@ -48,6 +51,9 @@ def call_llm(
     choice = data.get("choices", [{}])[0]
     message = choice.get("message", {})
     usage = data.get("usage", {})
+
+    logger.info("LLM调用 model=%s tokens=%s finish=%s",
+                model, usage.get("total_tokens", 0), choice.get("finish_reason", ""))
 
     return {
         "content": message.get("content", ""),

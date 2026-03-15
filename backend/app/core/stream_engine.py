@@ -6,9 +6,10 @@
     -> 参数转换 -> 槽位校验(追问) -> TOOL_CALL -> 回复生成
   -> RUN_FINISHED
 
-每步都记录证据链，支持管理后台查询。
+每步都记录证据链（含详细输入/输出），支持管理后台查询和日志全链路追踪。
 """
 import json
+import logging
 import time
 import re
 import traceback
@@ -30,6 +31,8 @@ from app.core.context_manager import (
 )
 from app.core.evidence import EvidenceCollector
 from app.core.workflow_engine import WorkflowExecutor
+
+logger = logging.getLogger("beaver.engine")
 
 
 async def stream_dialog(
@@ -109,6 +112,7 @@ async def _stream_dialog_inner(
         "existing_entities": ctx.get("entities", {}),
         "last_intent": ctx.get("last_intent"),
         "has_summary": bool(ctx.get("summary")),
+        "history_intents": ctx.get("history_intents", []),
     }, int((time.time() - t0) * 1000))
 
     # -- Step 2: 加载技能 --
@@ -128,12 +132,16 @@ async def _stream_dialog_inner(
     yield agui.step_started("intent_recognition")
     t0 = time.time()
 
-    matched_skill, confidence, rule_entities = _recognize_intent(
+    matched_skill, confidence, rule_entities, intent_detail = _recognize_intent(
         db, tenant_id, message, skills, ctx
     )
 
     if not matched_skill:
-        evidence.add_step("intent_recognition", {"result": "no_match"}, int((time.time() - t0) * 1000))
+        evidence.add_step("intent_recognition", {
+            "result": "no_match",
+            "user_message": message,
+            "candidates": intent_detail.get("candidates", []),
+        }, int((time.time() - t0) * 1000))
         yield agui.step_finished("intent_recognition")
         async for evt in _stream_text(
             "抱歉，我暂时无法理解您的问题。您可以试试：查看产线进度、查询现场人员、提交投诉等。"
@@ -143,8 +151,12 @@ async def _stream_dialog_inner(
 
     evidence.add_step("intent_recognition", {
         "skill": matched_skill.skill_code,
+        "skill_name": matched_skill.skill_name,
         "confidence": confidence,
         "rule_entities": rule_entities,
+        "match_method": intent_detail.get("match_method", "unknown"),
+        "candidates": intent_detail.get("candidates", []),
+        "user_message": message,
     }, int((time.time() - t0) * 1000))
 
     yield agui.custom_event("intent", {
@@ -173,21 +185,35 @@ async def _stream_dialog_inner(
 
     # 合并: 上下文旧实体 + 规则抽取的新实体
     entities = merge_entities(ctx.get("entities", {}), rule_entities)
+    entities_after_merge = {**entities}
 
     # LLM 增强抽取
     llm_entities = _enhanced_entity_extraction(db, tenant_id, message, matched_skill, entities, ctx)
     if llm_entities:
         entities = merge_entities(entities, llm_entities)
-        evidence.add_step("llm_entity_extraction", {"extracted": llm_entities})
+        evidence.add_step("llm_entity_extraction", {
+            "llm_raw": llm_entities,
+            "merged_result": {**entities},
+        })
 
     # 参数归一化 (日期、枚举等 + 属性级normalization_config)
+    entities_before_normalize = {**entities}
     entities = normalize_entities(entities, message, db=db, skill=matched_skill)
-    evidence.add_step("normalize_entities", {"normalized": entities})
+    evidence.add_step("normalize_entities", {
+        "before": entities_before_normalize,
+        "after": {**entities},
+    })
 
     # 参数转换 (名称->ID等)
+    entities_before_convert = {**entities}
     entities = convert_params(db, entities, matched_skill)
 
     evidence.add_step("entity_extraction", {
+        "context_entities": ctx.get("entities", {}),
+        "rule_entities": rule_entities,
+        "after_merge": entities_after_merge,
+        "after_normalize": entities_before_convert,
+        "after_convert": {**entities},
         "final_entities": entities,
     }, int((time.time() - t0) * 1000))
 
@@ -226,6 +252,8 @@ async def _stream_dialog_inner(
         evidence.add_step("slot_check", {
             "complete": False,
             "missing": [p["name"] for p in slot_result.missing_required],
+            "missing_detail": slot_result.missing_required,
+            "provided_entities": entities,
         })
         clarification = build_clarification_reply(slot_result)
         if clarification:
@@ -238,7 +266,7 @@ async def _stream_dialog_inner(
             save_context(db, session_id, ctx)
             return
     else:
-        evidence.add_step("slot_check", {"complete": True})
+        evidence.add_step("slot_check", {"complete": True, "entities": entities})
         # 需要确认的技能（如投诉提交）：槽位齐全时发送确认卡片
         if matched_skill.clarification_config and matched_skill.clarification_config.get("require_confirm"):
             if not ctx.get("confirmed"):
@@ -292,29 +320,50 @@ async def _stream_dialog_inner(
     evidence.add_step("tool_execution", {
         "tools_count": len(tools),
         "results_count": len(query_results),
+        "tools_detail": [
+            {"order": t.order_no, "entity_id": t.entity_id, "action_id": t.action_id}
+            for t in tools[:max_calls]
+        ],
     }, int((time.time() - t0) * 1000))
 
     yield agui.step_finished("tool_execution")
 
     # -- Step 8: 生成回答 --
     yield agui.step_started("reply_generation")
+    t0_reply = time.time()
 
     if matched_skill.response_template and query_results:
         reply = _render_template(matched_skill.response_template, query_results, entities)
         async for evt in _stream_text(reply):
             yield evt
+        evidence.add_step("reply_generation", {
+            "method": "template",
+            "template_preview": (matched_skill.response_template or "")[:200],
+        }, int((time.time() - t0_reply) * 1000))
     elif query_results:
         llm_config = _get_llm_config(db, tenant_id, "response")
         if llm_config:
             async for evt in _stream_llm_reply(llm_config, message, matched_skill, query_results):
                 yield evt
+            evidence.add_step("reply_generation", {
+                "method": "llm",
+                "model": llm_config.model_name,
+                "prompt_preview": (matched_skill.response_prompt or "")[:200],
+                "data_size": len(json.dumps(query_results, ensure_ascii=False, default=str)),
+            }, int((time.time() - t0_reply) * 1000))
         else:
             reply = _format_data_as_text(query_results)
             async for evt in _stream_text(reply):
                 yield evt
+            evidence.add_step("reply_generation", {
+                "method": "text_format",
+            }, int((time.time() - t0_reply) * 1000))
     else:
         async for evt in _stream_text("查询到的信息为空，请确认您的问题或稍后再试。"):
             yield evt
+        evidence.add_step("reply_generation", {
+            "method": "empty_result",
+        }, int((time.time() - t0_reply) * 1000))
 
     yield agui.step_finished("reply_generation")
 
@@ -352,36 +401,54 @@ async def _stream_text(text: str):
 
 def _recognize_intent(db: Session, tenant_id: int, message: str,
                       skills: list, ctx: dict = None):
-    """意图识别（规则优先,LLM兜底）"""
+    """意图识别（规则优先,LLM兜底）
+    
+    返回: (skill, confidence, entities, detail)
+    detail 包含匹配过程详情，用于全链路日志
+    """
     candidates = []
     for skill in skills:
         score = 0
         hit_count = 0
+        hit_keywords = []
         entities = {}
 
         keywords = skill.match_keywords or []
         for kw in keywords:
             if kw in message:
                 hit_count += 1
+                hit_keywords.append(kw)
         if hit_count > 0:
             score = 0.7 + min(hit_count * 0.1, 0.28)
 
         patterns = skill.match_patterns or []
+        hit_patterns = []
         for pattern in patterns:
             try:
                 match = re.search(pattern, message)
                 if match:
                     score = max(score, 0.9)
                     entities.update(match.groupdict())
+                    hit_patterns.append(pattern)
             except re.error:
                 pass
 
         if score > 0:
-            candidates.append((skill, score, entities))
+            candidates.append((skill, score, entities, hit_keywords, hit_patterns))
+
+    # 构建候选详情
+    candidates_detail = [
+        {"skill": c[0].skill_code, "score": c[1], "keywords": c[3], "patterns": c[4]}
+        for c in candidates
+    ]
 
     if candidates:
         candidates.sort(key=lambda x: x[1], reverse=True)
-        return candidates[0]
+        best = candidates[0]
+        return best[0], best[1], best[2], {
+            "match_method": "rule",
+            "candidates": candidates_detail,
+        }
 
     # LLM 兜底
     llm_config = _get_llm_config(db, tenant_id, "intent")
@@ -408,14 +475,27 @@ def _recognize_intent(db: Session, tenant_id: int, message: str,
             intent_code = llm_result.get("intent")
             confidence = llm_result.get("confidence", 0)
             entities = llm_result.get("entities", {})
+            llm_detail = {
+                "match_method": "llm",
+                "llm_intent": intent_code,
+                "llm_confidence": confidence,
+                "llm_entities": entities,
+                "tokens_used": llm_result.get("tokens_used", 0),
+                "candidates": candidates_detail,
+            }
             if intent_code and confidence > 0.6:
                 for skill in skills:
                     if skill.skill_code == intent_code:
-                        return skill, confidence, entities
-        except Exception:
-            pass
+                        return skill, confidence, entities, llm_detail
+            return None, 0, {}, llm_detail
+        except Exception as exc:
+            return None, 0, {}, {
+                "match_method": "llm_error",
+                "error": str(exc),
+                "candidates": candidates_detail,
+            }
 
-    return None, 0, {}
+    return None, 0, {}, {"match_method": "none", "candidates": candidates_detail}
 
 
 def _enhanced_entity_extraction(
@@ -641,6 +721,13 @@ def _execute_tool_with_events(
                 if evidence:
                     evidence.add_step(f"tool_{tool_name}", {
                         "source": result.get("source", "api"),
+                        "status_code": result.get("status_code"),
+                        "response_time_ms": result.get("response_time_ms"),
+                        "request": {
+                            "method": api_config.get("http_method", "GET"),
+                            "path": api_config.get("api_path", ""),
+                            "params_keys": list(params.keys()),
+                        },
                     }, int((time.time() - t0) * 1000))
                 return {"events": events, "data": result}
             except Exception as exc:
@@ -738,8 +825,31 @@ def _execute_tool_with_events(
             tc_id, json.dumps(result, ensure_ascii=False, default=str)
         ))
         if evidence:
+            # 构建响应摘要(避免日志过大)
+            data_preview = result.get("data")
+            if isinstance(data_preview, dict):
+                inner = data_preview.get("data", data_preview)
+                items = None
+                if isinstance(inner, dict):
+                    items = inner.get("items")
+                elif isinstance(inner, list):
+                    items = inner
+                if isinstance(items, list):
+                    data_preview = f"[{len(items)} items]"
             evidence.add_step(f"tool_{tool_name}", {
                 "source": result.get("source", "api"),
+                "status_code": result.get("status_code"),
+                "response_time_ms": result.get("response_time_ms"),
+                "request": {
+                    "method": action.http_method,
+                    "path": action.api_path,
+                    "params_keys": list(params.keys()),
+                    "has_template": bool(action.request_template),
+                    "has_response_mapping": bool(action.response_mapping),
+                    "param_mapping": param_mapping,
+                },
+                "response_preview": str(data_preview)[:500],
+                "aggregated": result.get("aggregated"),
             }, int((time.time() - t0) * 1000))
         return {"events": events, "data": result}
     except Exception as exc:

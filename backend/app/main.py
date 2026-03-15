@@ -1,10 +1,21 @@
 """Beaver AI Agent - FastAPI 应用入口"""
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import engine, Base
+
+# 配置全链路日志: beaver.* 命名空间
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s %(message)s",
+    datefmt="%H:%M:%S",
+)
+# beaver.* 子日志器: evidence / engine / connector / llm
+for _ns in ("beaver.evidence", "beaver.engine", "beaver.connector", "beaver.llm"):
+    logging.getLogger(_ns).setLevel(logging.INFO)
 
 # 导入所有模型,确保 create_all 能发现
 from app.models import (  # noqa: F401

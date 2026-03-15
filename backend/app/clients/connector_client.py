@@ -1,8 +1,11 @@
 """连接器HTTP客户端 - 通过连接器配置调用外部API"""
 import httpx
 import json
+import logging
 from typing import Optional
 from string import Template
+
+logger = logging.getLogger("beaver.connector")
 
 
 class ConnectorClient:
@@ -81,6 +84,9 @@ class ConnectorClient:
             else:
                 request_body = mapped_params
 
+        logger.info("API调用 %s %s params_keys=%s has_body=%s",
+                     method, url, list((mapped_params or {}).keys()), request_body is not None)
+
         try:
             with httpx.Client(timeout=self.timeout) as client:
                 if method == "GET":
@@ -110,6 +116,7 @@ class ConnectorClient:
                 }
 
         except httpx.HTTPError as e:
+            logger.error("API调用失败 %s %s: %s", method, url, e)
             # 如果API失败且启用了mock，降级到mock
             if mock_response:
                 return {"data": mock_response, "source": "mock_fallback", "error": str(e)}
