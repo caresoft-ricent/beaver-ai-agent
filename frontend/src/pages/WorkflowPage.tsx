@@ -6,10 +6,11 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button, message, Space, Spin, Tag, Typography, Tooltip, Drawer } from 'antd';
+import { Button, message, Space, Spin, Tag, Typography, Tooltip, Drawer, Dropdown } from 'antd';
+import type { MenuProps } from 'antd';
 import {
   ArrowLeftOutlined, SaveOutlined, QuestionCircleOutlined,
-  ApartmentOutlined,
+  ApartmentOutlined, DownloadOutlined, UploadOutlined, MoreOutlined,
 } from '@ant-design/icons';
 import { getSkill, updateSkill, getEntities, getActions } from '../api/admin';
 import WorkflowEditor from '../components/WorkflowEditor';
@@ -35,6 +36,48 @@ export default function WorkflowPage() {
   const [entities, setEntities] = useState<EntityItem[]>([]);
   const [dirty, setDirty] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+
+  const moreMenuItems: MenuProps['items'] = [
+    {
+      key: 'export', label: '导出 JSON', icon: <DownloadOutlined />,
+      onClick: () => {
+        if (!workflowConfig) { message.warning('暂无流程数据'); return; }
+        const blob = new Blob([JSON.stringify(workflowConfig, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `workflow-${skillCode || id}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+    },
+    {
+      key: 'import', label: '导入 JSON', icon: <UploadOutlined />,
+      onClick: () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = async (e) => {
+          const file = (e.target as HTMLInputElement).files?.[0];
+          if (!file) return;
+          try {
+            const text = await file.text();
+            const cfg = JSON.parse(text);
+            if (cfg && cfg.nodes) {
+              setWorkflowConfig(cfg);
+              setDirty(true);
+              message.success('导入成功');
+            } else {
+              message.error('无效的流程配置文件');
+            }
+          } catch {
+            message.error('文件解析失败');
+          }
+        };
+        input.click();
+      },
+    },
+  ];
 
   // 加载技能数据 & 实体列表
   useEffect(() => {
@@ -98,25 +141,30 @@ export default function WorkflowPage() {
   }
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#fff' }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#FAFBFC' }}>
       {/* 顶部操作栏 */}
       <div style={{
         height: 56, padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        borderBottom: '1px solid #f0f0f0', background: '#fafafa', flexShrink: 0,
+        borderBottom: '1px solid #E2E8F0', background: '#fff', flexShrink: 0,
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       }}>
-        <Space size={12}>
+        <Space size={16}>
           <Tooltip title="返回技能列表">
-            <Button icon={<ArrowLeftOutlined />} onClick={handleBack}>返回</Button>
+            <Button icon={<ArrowLeftOutlined />} onClick={handleBack} />
           </Tooltip>
-          <ApartmentOutlined style={{ fontSize: 18, color: '#722ed1' }} />
+          <div style={{ height: 24, width: 1, background: '#E2E8F0' }} />
+          <ApartmentOutlined style={{ fontSize: 18, color: '#7C3AED' }} />
           <div>
-            <Title level={5} style={{ margin: 0, lineHeight: 1.2 }}>{skillName}</Title>
+            <Title level={5} style={{ margin: 0, lineHeight: 1.3, fontSize: 15 }}>{skillName}</Title>
             <Text type="secondary" style={{ fontSize: 12 }}>{skillCode} · 流程编排</Text>
           </div>
           {dirty && <Tag color="orange">未保存</Tag>}
         </Space>
-        <Space>
+        <Space size={8}>
           <Button icon={<QuestionCircleOutlined />} onClick={() => setHelpOpen(true)}>操作说明</Button>
+          <Dropdown menu={{ items: moreMenuItems }} placement="bottomRight">
+            <Button icon={<MoreOutlined />} />
+          </Dropdown>
           <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave}>
             保存
           </Button>
@@ -158,24 +206,27 @@ export default function WorkflowPage() {
           <Title level={5}>节点类型</Title>
           <Paragraph>
             <ul>
-              <li><Tag color="#1890ff">工具调用</Tag> 调用业务本体的操作/API，获取数据或执行动作</li>
-              <li><Tag color="#faad14">条件判断</Tag> 根据前序节点的结果进行条件分支路由</li>
-              <li><Tag color="#722ed1">并行执行</Tag> 同时执行多个工具调用节点，提升效率</li>
-              <li><Tag color="#52c41a">用户确认</Tag> 暂停流程，等待用户确认后继续</li>
-              <li><Tag color="#eb2f96">AI 生成</Tag> 调用大语言模型生成回答</li>
-              <li><Tag color="#13c2c2">文本回复</Tag> 直接输出预设的模板文本</li>
+              <li><Tag color="#2563EB">工具调用</Tag> 调用业务本体的操作/API，获取数据或执行动作</li>
+              <li><Tag color="#F59E0B">条件判断</Tag> 根据前序节点的结果进行条件分支路由</li>
+              <li><Tag color="#7C3AED">并行执行</Tag> 同时执行多个工具调用节点，提升效率</li>
+              <li><Tag color="#10B981">用户确认</Tag> 暂停流程，等待用户确认后继续</li>
+              <li><Tag color="#EC4899">AI 生成</Tag> 调用大语言模型生成回答</li>
+              <li><Tag color="#06B6D4">文本回复</Tag> 直接输出预设的模板文本</li>
             </ul>
           </Paragraph>
 
           <Title level={5}>画布操作</Title>
           <Paragraph>
             <ul>
+              <li><b>添加节点</b> — 从左侧面板拖拽或点击节点类型</li>
+              <li><b>建立连线</b> — 从一个节点右侧端口拖拽到另一节点左侧端口</li>
               <li><b>平移画布</b> — 在画布空白处拖动鼠标</li>
-              <li><b>缩放画布</b> — 鼠标滚轮 或 左下角缩放按钮</li>
-              <li><b>移动节点</b> — 直接拖动节点</li>
-              <li><b>删除连线</b> — 点击连线后按 Backspace</li>
-              <li><b>删除节点</b> — 选中节点后在右侧面板点击删除</li>
-              <li><b>设为起点</b> — 在属性面板点击 📌 图标</li>
+              <li><b>缩放画布</b> — 鼠标滚轮或左下角缩放按钮</li>
+              <li><b>框选节点</b> — 按住鼠标在画布空白处拖动框选</li>
+              <li><b>右键菜单</b> — 右键节点可复制、删除、设为起点、断开连线</li>
+              <li><b>删除</b> — 选中节点后按 Delete/Backspace 键</li>
+              <li><b>复制节点</b> — Ctrl/⌘ + D</li>
+              <li><b>设为起点</b> — 右键菜单或属性面板中设置</li>
             </ul>
           </Paragraph>
 
