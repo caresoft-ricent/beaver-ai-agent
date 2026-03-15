@@ -199,6 +199,21 @@ class ActionParameterCreate(BaseModel):
     is_output: bool = False
     is_required: bool = False
     default_value: Optional[str] = None
+    value_type: str = "none"
+
+
+class ActionParameterUpdate(BaseModel):
+    property_id: Optional[int] = None
+    name: Optional[str] = None
+    source_property: Optional[str] = None
+    type: Optional[str] = None
+    title: Optional[str] = None
+    param_description: Optional[str] = None
+    is_input: Optional[bool] = None
+    is_output: Optional[bool] = None
+    is_required: Optional[bool] = None
+    default_value: Optional[str] = None
+    value_type: Optional[str] = None
 
 
 class ActionParameterOut(BaseModel):
@@ -213,5 +228,7 @@ class ActionParameterOut(BaseModel):
     is_input: bool = False
     is_output: bool = False
     is_required: bool = False
+    default_value: Optional[str] = None
+    value_type: str = "none"
 
     model_config = {"from_attributes": True}

@@ -136,6 +136,9 @@ export const getActionParameters = (actionId: number) =>
 export const createActionParameter = (actionId: number, data: Record<string, unknown>) =>
   client.post(`/admin/ontologies/actions/${actionId}/parameters`, data);
 
+export const updateActionParameter = (paramId: number, data: Record<string, unknown>) =>
+  client.put(`/admin/ontologies/actions/parameters/${paramId}`, data);
+
 export const deleteActionParameter = (paramId: number) =>
   client.delete(`/admin/ontologies/actions/parameters/${paramId}`);
 

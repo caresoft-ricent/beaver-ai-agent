@@ -50,5 +50,6 @@ class ActionParameter(Base):
     direction = Column(String(8), default="input", comment="方向(兼容旧数据): input/output")
     is_required = Column(Boolean, default=False, comment="是否必填")
     default_value = Column(String(256), comment="默认值")
+    value_type = Column(String(32), default="none", comment="取值方式: none/fixed/count/sum/local_func")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

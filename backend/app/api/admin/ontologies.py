@@ -12,7 +12,7 @@ from app.schemas.ontology import (
     EntityRelationCreate, EntityRelationOut,
     BasePropertyCreate, BasePropertyOut,
     ActionCreate, ActionUpdate, ActionOut,
-    ActionParameterCreate, ActionParameterOut,
+    ActionParameterCreate, ActionParameterUpdate, ActionParameterOut,
 )
 from app.schemas.common import ResponseBase
 
@@ -226,7 +226,19 @@ def create_standalone_action(req: ActionCreate, db: Session = Depends(get_db)):
     return ResponseBase(data=ActionOut.model_validate(action).model_dump())
 
 
-# 删除操作参数(放在 /actions/{action_id} 之前避免路由冲突)
+# 更新操作参数(放在 /actions/{action_id} 之前避免路由冲突)
+@router.put("/actions/parameters/{param_id}")
+def update_action_parameter(param_id: int, req: ActionParameterUpdate, db: Session = Depends(get_db)):
+    param = db.query(ActionParameter).filter(ActionParameter.id == param_id).first()
+    if not param:
+        raise HTTPException(status_code=404, detail="参数不存在")
+    for key, value in req.model_dump(exclude_unset=True).items():
+        setattr(param, key, value)
+    db.commit()
+    db.refresh(param)
+    return ResponseBase(data=ActionParameterOut.model_validate(param).model_dump())
+
+
 @router.delete("/actions/parameters/{param_id}")
 def delete_action_parameter(param_id: int, db: Session = Depends(get_db)):
     param = db.query(ActionParameter).filter(ActionParameter.id == param_id).first()

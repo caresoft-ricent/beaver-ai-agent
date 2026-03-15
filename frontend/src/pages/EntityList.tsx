@@ -13,7 +13,7 @@ import {
   getEntities, getEntity, createEntity, updateEntity, deleteEntity, publishEntity,
   getConnectors, createAction, deleteAction, createEntityProperty, deleteEntityProperty,
   updateEntityProperty, getAction, updateAction, getActionParameters,
-  createActionParameter, deleteActionParameter,
+  createActionParameter, updateActionParameter, deleteActionParameter,
 } from '../api/admin';
 
 const { Text } = Typography;
@@ -48,7 +48,7 @@ interface PropertyItem {
   mapping_config?: Record<string, unknown>;
 }
 interface ActionItem { id: number; entity_id: number; tenant_id: number; connector_id?: number; action_code: string; action_name: string; action_description?: string; category?: string; http_method: string; api_path?: string; request_template?: Record<string, unknown>; response_mapping?: Record<string, unknown>; cache_ttl?: number; mock_response?: Record<string, unknown>; tags?: string[]; }
-interface ActionParameterItem { id: number; action_id: number; property_id?: number; name: string; source_property?: string; type: string; title?: string; param_description?: string; is_input: boolean; is_output: boolean; is_required: boolean; }
+interface ActionParameterItem { id: number; action_id: number; property_id?: number; name: string; source_property?: string; type: string; title?: string; param_description?: string; is_input: boolean; is_output: boolean; is_required: boolean; default_value?: string; value_type: string; }
 
 const modeIcon: Record<string, React.ReactNode> = {
   api: <ApiOutlined />,
@@ -91,6 +91,9 @@ export default function EntityList() {
   const [actionDetailLoading, setActionDetailLoading] = useState(false);
   const [actionEditForm] = Form.useForm();
   const [actionParamForm] = Form.useForm();
+  const [paramEditForm] = Form.useForm();
+  const [paramEditOpen, setParamEditOpen] = useState(false);
+  const [editingParam, setEditingParam] = useState<ActionParameterItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -280,6 +283,35 @@ export default function EntityList() {
     if (!actionDetailData) return;
     await deleteActionParameter(paramId);
     message.success('已删除');
+    const res = await getActionParameters(actionDetailData.id);
+    setActionParams(res.data.data || []);
+  };
+
+  const openParamEdit = (record: ActionParameterItem) => {
+    setEditingParam(record);
+    paramEditForm.setFieldsValue({
+      property_id: record.property_id || undefined,
+      name: record.name,
+      source_property: record.source_property,
+      type: record.type,
+      title: record.title,
+      param_description: record.param_description,
+      is_input: record.is_input,
+      is_output: record.is_output,
+      is_required: record.is_required,
+      default_value: record.default_value || '',
+      value_type: record.value_type || 'none',
+    });
+    setParamEditOpen(true);
+  };
+
+  const handleParamEditSave = async () => {
+    if (!editingParam || !actionDetailData) return;
+    const values = await paramEditForm.validateFields();
+    await updateActionParameter(editingParam.id, values);
+    message.success('参数已更新');
+    setParamEditOpen(false);
+    setEditingParam(null);
     const res = await getActionParameters(actionDetailData.id);
     setActionParams(res.data.data || []);
   };
@@ -689,24 +721,43 @@ export default function EntityList() {
                   />
                   {actionParams.length > 0 && (
                     <Table dataSource={actionParams} rowKey="id" size="small" pagination={false} style={{ marginBottom: 12 }}
+                      scroll={{ x: 900 }}
                       columns={[
-                        { title: 'API参数名', dataIndex: 'name', width: 110 },
                         {
                           title: <Tooltip title="来源于本体属性，可继承类型/标题/描述">来源属性 <InfoCircleOutlined style={{fontSize:11}} /></Tooltip>,
                           dataIndex: 'source_property', width: 100,
                           render: (v: string) => v ? <Tag color="purple">{v}</Tag> : <Text type="secondary">手动</Text>,
                         },
+                        { title: 'API参数名', dataIndex: 'name', width: 100 },
                         { title: '标题', dataIndex: 'title', width: 70 },
                         { title: '类型', dataIndex: 'type', width: 65, render: (t: string) => <Tag>{t}</Tag> },
                         { title: '输入', dataIndex: 'is_input', width: 45, align: 'center' as const, render: (v: boolean) => v ? <Tag color="blue">是</Tag> : '—' },
                         { title: '输出', dataIndex: 'is_output', width: 45, align: 'center' as const, render: (v: boolean) => v ? <Tag color="green">是</Tag> : '—' },
                         { title: '必填', dataIndex: 'is_required', width: 45, align: 'center' as const, render: (v: boolean) => v ? <Tag color="red">是</Tag> : '—' },
+                        { title: '默认值', dataIndex: 'default_value', width: 80, render: (v: string) => v || <Text type="secondary">—</Text> },
                         {
-                          title: '', width: 50,
+                          title: '取值方式', dataIndex: 'value_type', width: 90,
+                          render: (v: string) => {
+                            const m: Record<string, { label: string; color: string }> = {
+                              none: { label: '不转换', color: 'default' },
+                              fixed: { label: '固定值', color: 'orange' },
+                              count: { label: 'count', color: 'blue' },
+                              sum: { label: 'sum', color: 'cyan' },
+                              local_func: { label: '本地函数', color: 'purple' },
+                            };
+                            const info = m[v] || m.none;
+                            return <Tag color={info.color}>{info.label}</Tag>;
+                          },
+                        },
+                        {
+                          title: '', width: 80, fixed: 'right' as const,
                           render: (_: unknown, record: ActionParameterItem) => (
-                            <Popconfirm title="删除此参数?" okText="确认" cancelText="取消" onConfirm={() => handleDeleteActionParam(record.id)}>
-                              <Button size="small" danger icon={<DeleteOutlined />} />
-                            </Popconfirm>
+                            <Space size="small">
+                              <Button size="small" type="link" icon={<EditOutlined />} onClick={() => openParamEdit(record)} />
+                              <Popconfirm title="删除此参数?" okText="确认" cancelText="取消" onConfirm={() => handleDeleteActionParam(record.id)}>
+                                <Button size="small" danger icon={<DeleteOutlined />} />
+                              </Popconfirm>
+                            </Space>
                           ),
                         },
                       ]}
@@ -758,6 +809,18 @@ export default function EntityList() {
                     <Form.Item name="is_required" valuePropName="checked" initialValue={false}>
                       <Switch checkedChildren="必填" unCheckedChildren="可选" />
                     </Form.Item>
+                    <Form.Item name="value_type" initialValue="none">
+                      <Select style={{ width: 110 }} options={[
+                        { value: 'none', label: '不转换' },
+                        { value: 'fixed', label: '固定值' },
+                        { value: 'count', label: '聚合(count)' },
+                        { value: 'sum', label: '聚合(sum)' },
+                        { value: 'local_func', label: '本地函数' },
+                      ]} />
+                    </Form.Item>
+                    <Form.Item name="default_value">
+                      <Input placeholder="默认值" style={{ width: 90 }} />
+                    </Form.Item>
                     <Form.Item>
                       <Button type="primary" icon={<PlusOutlined />} onClick={handleAddActionParam}>添加</Button>
                     </Form.Item>
@@ -767,6 +830,85 @@ export default function EntityList() {
             },
           ]} />
         )}
+      </Modal>
+
+      {/* 参数编辑 Modal */}
+      <Modal
+        title={`编辑参数 — ${editingParam?.name || ''}`}
+        open={paramEditOpen}
+        onOk={handleParamEditSave}
+        onCancel={() => { setParamEditOpen(false); setEditingParam(null); }}
+        width={600}
+        destroyOnClose
+        okText="确认" cancelText="取消"
+      >
+        <Form form={paramEditForm} layout="vertical" style={{ marginTop: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <Form.Item name="property_id" label="来源属性">
+              <Select allowClear placeholder="手动填写"
+                onChange={(val: number | undefined) => {
+                  if (val) {
+                    const prop = properties.find(p => p.id === val);
+                    if (prop) {
+                      paramEditForm.setFieldsValue({
+                        name: prop.name,
+                        source_property: prop.name,
+                        type: prop.type,
+                        title: prop.title || '',
+                      });
+                    }
+                  } else {
+                    paramEditForm.setFieldsValue({ source_property: '' });
+                  }
+                }}
+                options={properties.map(p => ({ value: p.id, label: `${p.name}${p.title ? ` (${p.title})` : ''}` }))} />
+            </Form.Item>
+            <Form.Item name="name" label="API参数名" rules={[{ required: true, message: '请输入参数名' }]}>
+              <Input />
+            </Form.Item>
+          </div>
+          <Form.Item name="source_property" hidden><Input /></Form.Item>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+            <Form.Item name="title" label="标题">
+              <Input placeholder="中文标题" />
+            </Form.Item>
+            <Form.Item name="type" label="类型" rules={[{ required: true }]}>
+              <Select options={[
+                { value: 'string', label: 'string' },
+                { value: 'number', label: 'number' },
+                { value: 'date', label: 'date' },
+                { value: 'boolean', label: 'boolean' },
+                { value: 'json', label: 'json' },
+              ]} />
+            </Form.Item>
+            <Form.Item name="value_type" label="取值方式" rules={[{ required: true }]}>
+              <Select options={[
+                { value: 'none', label: '不转换' },
+                { value: 'fixed', label: '固定值' },
+                { value: 'count', label: '聚合(count)' },
+                { value: 'sum', label: '聚合(sum)' },
+                { value: 'local_func', label: '本地函数' },
+              ]} />
+            </Form.Item>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+            <Form.Item name="is_input" label="输入" valuePropName="checked">
+              <Switch checkedChildren="是" unCheckedChildren="否" />
+            </Form.Item>
+            <Form.Item name="is_output" label="输出" valuePropName="checked">
+              <Switch checkedChildren="是" unCheckedChildren="否" />
+            </Form.Item>
+            <Form.Item name="is_required" label="必填" valuePropName="checked">
+              <Switch checkedChildren="是" unCheckedChildren="否" />
+            </Form.Item>
+          </div>
+          <Form.Item name="default_value" label="默认值">
+            <Input placeholder="可为空" allowClear />
+          </Form.Item>
+          <Form.Item name="param_description" label="参数描述">
+            <Input.TextArea rows={2} placeholder="参数说明" />
+          </Form.Item>
+        </Form>
       </Modal>
     </>
   );
