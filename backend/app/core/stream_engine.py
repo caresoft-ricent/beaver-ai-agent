@@ -33,6 +33,8 @@ from app.core.evidence import EvidenceCollector
 from app.core.workflow_engine import WorkflowExecutor
 from app.core import pipeline
 from app.kernel.scope import BeaverSessionScope
+from app.kernel.capability import CapabilityRegistry
+from app.kernel.policy import PolicyGuard
 
 logger = logging.getLogger("beaver.engine")
 
@@ -321,6 +323,45 @@ async def _stream_dialog_inner(
             ctx["workflow_paused"] = executor.pause_data
             save_context(db, session_id, ctx)
         return
+
+    # ── Step 7.1: PolicyGuard — 能力级策略检查 ──
+    registry = CapabilityRegistry(db, tenant_id)
+    caps = registry.resolve_skill_capabilities(matched_skill)
+    if caps:
+        guard = PolicyGuard()
+        blocked = guard.any_blocked(caps, scope or BeaverSessionScope(), ctx)
+        if blocked:
+            cap, policy_result = blocked
+            evidence.add_step("policy_guard", {
+                "blocked": True,
+                "capability": cap.code,
+                "side_effect": cap.side_effect,
+                "reason": policy_result.reason,
+                "blocked_by": policy_result.blocked_by,
+                "requires_confirmation": policy_result.requires_confirmation,
+            })
+            if policy_result.requires_confirmation:
+                yield agui.custom_event("card", {
+                    "card_type": "confirm",
+                    "title": "操作确认",
+                    "text": policy_result.confirmation_message,
+                    "capability_code": cap.code,
+                    "skill_code": matched_skill.skill_code,
+                })
+                async for evt in _stream_text(policy_result.confirmation_message):
+                    yield evt
+                save_context(db, session_id, ctx)
+                return
+            else:
+                async for evt in _stream_text(policy_result.reason):
+                    yield evt
+                return
+        else:
+            evidence.add_step("policy_guard", {
+                "blocked": False,
+                "capabilities": [c.code for c in caps],
+                "side_effects": list({c.side_effect for c in caps}),
+            })
 
     # ── 简单模式: 线性工具链(现有逻辑不变) ──
     yield agui.step_started("tool_execution")

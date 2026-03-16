@@ -28,6 +28,14 @@ class Action(Base):
     request_template = Column(JSON, comment="请求模板(JSON)")
     response_mapping = Column(JSON, comment="响应映射(JSON): 将API返回映射到本体属性")
     response_description = Column(Text, comment="响应数据说明: 描述API返回字段的业务含义，如枚举值映射等，提交给LLM辅助生成回复")
+    # ── Stage 2: Capability 注册字段 ──
+    capability_code = Column(String(128), nullable=True, index=True, comment="能力编码: entity_code.action_code 格式, 如 issue.close")
+    side_effect_type = Column(String(16), nullable=True, default="read", comment="副作用类型: read/write/delete")
+    input_schema = Column(JSON, nullable=True, comment="输入参数 JSON Schema")
+    output_schema = Column(JSON, nullable=True, comment="输出参数 JSON Schema")
+    # ── Stage 3: Policy 配置字段 ──
+    requires_confirmation = Column(Boolean, nullable=True, default=False, comment="是否需要用户确认(写/删操作)")
+    policy_config = Column(JSON, nullable=True, comment="安全策略配置(JSON): scope_check, preconditions, rate_limit等")
     cache_ttl = Column(Integer, default=0, comment="缓存时间(秒), 0=不缓存")
     mock_response = Column(JSON, comment="Mock响应数据(JSON)")
     created_at = Column(DateTime, server_default=func.now())

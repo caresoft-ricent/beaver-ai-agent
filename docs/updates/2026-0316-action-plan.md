@@ -2,7 +2,7 @@
 
 > 创建日期：2026-03-16  
 > 基于文档：`docs/0316/01-总纲.md` ~ `07-兼容性分析.md`  
-> 当前进度：Stage 0 ✅ → Stage 1 ✅ → Stage 1.5 (引擎合并) ✅
+> 当前进度：Stage 0 ✅ → Stage 1 ✅ → Stage 1.5 (引擎合并) ✅ → Stage 2 ✅ → Stage 3 ✅
 
 ---
 
@@ -13,8 +13,8 @@
 | Stage 0 | 测试基础 + Pipeline 抽取 | 安全网 + 消除重复 | pipeline.py + 40 测试 | ✅ 完成 |
 | Stage 1 | Scope 接入 | 让系统知道"谁在哪个企业做什么" | BeaverSessionScope + 引擎改造 | ✅ 完成 (stage1-done) |
 | Stage 1.5 | 引擎合并 | 同步引擎合并到流式 | /completions 走 stream_dialog | ✅ 完成 |
-| Stage 2 | Capability 注册 | 统一能力注册体系 | CapabilityRegistry + 声明式能力 | ⬜ 待启动 |
-| Stage 3 | Policy Guard | 安全执行策略 | PolicyGuard + 确认/权限/前置条件 | ⬜ 待启动 |
+| Stage 2 | Capability 注册 | 统一能力注册体系 | CapabilityRegistry + 声明式能力 | ✅ 完成 |
+| Stage 3 | Policy Guard | 安全执行策略 | PolicyGuard + 确认/权限/前置条件 | ✅ 完成 |
 | Stage 4 | Orchestrator 升级 | 智能编排 | Orchestrator + 多步推理 | ⬜ 待启动 |
 
 ---
@@ -109,7 +109,7 @@
 
 ---
 
-## Stage 2：Capability 注册（规划）
+## Stage 2：Capability 注册（已完成）
 
 **目标**: 统一能力注册体系
 
@@ -125,16 +125,27 @@ class Capability:
     policy_config: dict    # 安全策略
 ```
 
-### 实施计划
+### 实施成果
 
-- Action 模型扩展 `capability_code`, `side_effect_type`, `input_schema`, `output_schema`
-- 实现 CapabilityRegistry 注册与查询
-- 技能工具链通过 capability_code 引用能力
-- Alembic 迁移脚本
+1. **Action 模型扩展**: 新增 `capability_code`, `side_effect_type`, `input_schema`, `output_schema` 字段
+2. **CapabilityRegistry**: `kernel/capability.py` — 能力注册与查询
+   - 按 `capability_code` / `action_id` / `side_effect` 查询
+   - 解析技能工具链为能力列表
+   - 从 ActionParameter 自动生成 input_schema
+   - 带缓存的能力查询
+3. **Alembic 迁移**: `f4a2b7c93e10` — 6 个新字段 + 索引
+
+### 完成标志
+
+- [x] Action 模型扩展 `capability_code`, `side_effect_type`, `input_schema`, `output_schema`
+- [x] CapabilityRegistry 注册与查询
+- [x] 技能工具链通过 action_id 解析能力
+- [x] Alembic 迁移脚本 `f4a2b7c93e10`
+- [x] 104/104 测试通过
 
 ---
 
-## Stage 3：Policy Guard（规划）
+## Stage 3：Policy Guard（已完成）
 
 **目标**: 安全执行策略
 
@@ -143,7 +154,29 @@ class Capability:
 - 写操作自动确认 (`requires_confirmation`)
 - 企业级权限校验 (`scope_check: "enterprise"`)
 - 前置条件检查 (`preconditions`)
-- 频率限制
+- 频率限制 — 预留接口
+
+### 实施成果
+
+1. **Action 模型扩展**: 新增 `requires_confirmation`, `policy_config` 字段
+2. **PolicyGuard**: `kernel/policy.py` — 安全策略守卫
+   - 只读操作自动放行
+   - 写/删操作确认检查 (requires_confirmation)
+   - 企业权限校验 (scope_check: enterprise/member)
+   - 前置条件检查 (preconditions: exists/eq)
+   - 批量检查 + 单个检查接口
+3. **引擎集成**: `stream_engine.py` Step 7.1 — 工具执行前自动进行策略检查
+   - 被阻止时发送确认卡片或拒绝消息
+   - 证据链记录策略检查结果
+
+### 完成标志
+
+- [x] PolicyGuard 实现及单元测试
+- [x] 写操作 requires_confirmation 检查
+- [x] 企业级权限校验 (scope_check)
+- [x] 前置条件检查 (preconditions)
+- [x] stream_engine 集成 PolicyGuard
+- [x] 104/104 测试通过
 
 ---
 
