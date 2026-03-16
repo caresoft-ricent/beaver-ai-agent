@@ -2,6 +2,7 @@
 import httpx
 import json
 import logging
+import re
 import shlex
 from typing import Optional
 from string import Template
@@ -161,13 +162,37 @@ class ConnectorClient:
         return mapped
 
     def _apply_template(self, template: dict, params: dict) -> dict:
-        """简单的JSON模板参数替换"""
+        """JSON模板参数替换，自动清理未替换的 ${...} 占位符"""
         result = json.loads(json.dumps(template))
         for key, value in params.items():
             result = json.loads(
                 json.dumps(result).replace(f"${{{key}}}", str(value))
             )
+        # 提取仍存在的未替换变量名，清理对应条目
+        unresolved = set(re.findall(r'\$\{(\w+)\}', json.dumps(result)))
+        if unresolved:
+            self._clean_unresolved(result, unresolved)
         return result
+
+    @staticmethod
+    def _clean_unresolved(obj, unresolved_vars: set):
+        """递归移除: (1) key 命中未替换变量名的条目  (2) 值为含 ${} 字符串的条目"""
+        if isinstance(obj, dict):
+            keys_to_remove = set()
+            for k, v in obj.items():
+                if k in unresolved_vars:
+                    keys_to_remove.add(k)
+                elif isinstance(v, str) and '${' in v:
+                    keys_to_remove.add(k)
+            for k in keys_to_remove:
+                del obj[k]
+            for v in obj.values():
+                if isinstance(v, (dict, list)):
+                    ConnectorClient._clean_unresolved(v, unresolved_vars)
+        elif isinstance(obj, list):
+            for item in obj:
+                if isinstance(item, (dict, list)):
+                    ConnectorClient._clean_unresolved(item, unresolved_vars)
 
     @staticmethod
     def _build_curl(method: str, url: str, headers: dict, body=None, params=None) -> str:

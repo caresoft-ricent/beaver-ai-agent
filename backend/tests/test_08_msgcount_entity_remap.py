@@ -189,3 +189,71 @@ class TestBatchDeleteSessions:
         sids = []
         count = db.query(ChatSession).filter(ChatSession.session_id.in_(sids)).delete(synchronize_session=False) if sids else 0
         assert count == 0
+
+
+# ─────────────────── 模板占位符清理 ───────────────────
+
+
+class TestTemplateCleanup:
+    """测试: _apply_template 自动清理未替换的 ${...} 占位符"""
+
+    def _make_client(self):
+        from app.clients.connector_client import ConnectorClient
+        return ConnectorClient({
+            "base_url": "https://example.com",
+            "auth_type": "api_key",
+            "auth_config": {},
+        })
+
+    def test_resolved_placeholder_kept(self):
+        """参数已提供时，正常替换保留"""
+        cli = self._make_client()
+        template = {
+            "filterModel": {
+                "customerName": {
+                    "type": "contains",
+                    "filter": "${customerName}",
+                    "filterType": "text",
+                }
+            }
+        }
+        result = cli._apply_template(template, {"customerName": "生益电子"})
+        assert result["filterModel"]["customerName"]["filter"] == "生益电子"
+
+    def test_unresolved_placeholder_removed(self):
+        """参数未提供时，包含 ${...} 的条目被清除"""
+        cli = self._make_client()
+        template = {
+            "datasetCode": "bi_stage_all",
+            "filterModel": {
+                "customerName": {
+                    "type": "contains",
+                    "filter": "${customerName}",
+                    "filterType": "text",
+                }
+            },
+            "showCount": True,
+        }
+        result = cli._apply_template(template, {})
+        assert result["filterModel"] == {}
+        assert result["datasetCode"] == "bi_stage_all"
+        assert result["showCount"] is True
+
+    def test_partial_resolve(self):
+        """多个过滤条件，仅清除未替换的"""
+        cli = self._make_client()
+        template = {
+            "filterModel": {
+                "customerName": {
+                    "filter": "${customerName}",
+                    "filterType": "text",
+                },
+                "status": {
+                    "filter": "${status}",
+                    "filterType": "text",
+                },
+            }
+        }
+        result = cli._apply_template(template, {"status": "进行中"})
+        assert "customerName" not in result["filterModel"]
+        assert result["filterModel"]["status"]["filter"] == "进行中"

@@ -165,6 +165,16 @@ export default function LogsPage() {
           <div key={i} style={{ padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
             <Tag color="blue">{s.step}</Tag>
             <Text type="secondary">{s.duration_ms}ms</Text>
+            {s.detail?.request?.curl && (
+              <Paragraph
+                code
+                copyable
+                style={{ margin: '4px 0 0', fontSize: 11, background: '#f6ffed', border: '1px solid #b7eb8f' }}
+                ellipsis={{ rows: 2, expandable: true }}
+              >
+                {s.detail.request.curl}
+              </Paragraph>
+            )}
             {s.detail && (
               <Paragraph
                 style={{ margin: '4px 0 0', fontSize: 12 }}
@@ -181,6 +191,16 @@ export default function LogsPage() {
             {result.errors.map((e: any, i: number) => (
               <div key={i} style={{ padding: '4px 0', color: '#cf1322' }}>
                 <Tag color="red">{e.step}</Tag> {e.error}
+                {e.curl && (
+                  <Paragraph
+                    code
+                    copyable
+                    style={{ fontSize: 11, marginTop: 4, background: '#fff7e6', border: '1px solid #ffd591' }}
+                    ellipsis={{ rows: 2, expandable: true }}
+                  >
+                    {e.curl}
+                  </Paragraph>
+                )}
                 {e.traceback && (
                   <Paragraph code style={{ fontSize: 11, marginTop: 4 }} ellipsis={{ rows: 3, expandable: true }}>
                     {e.traceback}
