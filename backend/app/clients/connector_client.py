@@ -2,10 +2,19 @@
 import httpx
 import json
 import logging
+import shlex
 from typing import Optional
 from string import Template
 
 logger = logging.getLogger("beaver.connector")
+
+
+class ConnectorAPIError(Exception):
+    """API调用失败，携带 curl 调试命令"""
+    def __init__(self, message: str, curl: str = "", status_code: int = None):
+        super().__init__(message)
+        self.curl = curl
+        self.status_code = status_code
 
 
 class ConnectorClient:
@@ -84,6 +93,9 @@ class ConnectorClient:
             else:
                 request_body = mapped_params
 
+        # 生成等效 curl 命令用于调试
+        curl_cmd = self._build_curl(method, url, headers, request_body, mapped_params)
+
         logger.info("API调用 %s %s params_keys=%s has_body=%s",
                      method, url, list((mapped_params or {}).keys()), request_body is not None)
 
@@ -113,14 +125,15 @@ class ConnectorClient:
                     "source": "api",
                     "status_code": resp.status_code,
                     "response_time_ms": int(resp.elapsed.total_seconds() * 1000),
+                    "curl": curl_cmd,
                 }
 
         except httpx.HTTPError as e:
-            logger.error("API调用失败 %s %s: %s", method, url, e)
+            logger.error("API调用失败 %s %s: %s\ncurl: %s", method, url, e, curl_cmd)
             # 如果API失败且启用了mock，降级到mock
             if mock_response:
-                return {"data": mock_response, "source": "mock_fallback", "error": str(e)}
-            raise
+                return {"data": mock_response, "source": "mock_fallback", "error": str(e), "curl": curl_cmd}
+            raise ConnectorAPIError(str(e), curl=curl_cmd, status_code=getattr(getattr(e, 'response', None), 'status_code', None))
 
     def _apply_param_mapping(self, params: Optional[dict], param_mapping: Optional[dict]) -> Optional[dict]:
         """应用参数名映射: 将语义参数名(如line_code)转换为API实际参数名(如regionId)
@@ -155,6 +168,24 @@ class ConnectorClient:
                 json.dumps(result).replace(f"${{{key}}}", str(value))
             )
         return result
+
+    @staticmethod
+    def _build_curl(method: str, url: str, headers: dict, body=None, params=None) -> str:
+        """生成等效 curl 命令(脱敏 Authorization)"""
+        parts = ["curl", "-X", method]
+        for k, v in headers.items():
+            val = v
+            if k.lower() == "authorization" and len(v) > 20:
+                val = v[:20] + "...[REDACTED]"
+            parts.extend(["-H", f"{k}: {val}"])
+        if body is not None:
+            parts.extend(["-d", json.dumps(body, ensure_ascii=False)])
+        final_url = url
+        if method == "GET" and params:
+            qs = "&".join(f"{k}={v}" for k, v in params.items())
+            final_url = f"{url}?{qs}"
+        parts.append(final_url)
+        return " ".join(shlex.quote(str(p)) for p in parts)
 
     def _apply_response_mapping(self, data: dict, mapping: Optional[dict]) -> dict:
         """应用响应映射，从API响应中提取需要的字段"""

@@ -51,14 +51,20 @@ class EvidenceCollector:
         })
         logger.info("── [%s] %dms %s", step, duration_ms, _safe_json(detail))
 
-    def add_error(self, step: str, error: str, traceback_str: str = ""):
-        """记录一个错误"""
-        self.errors.append({
+    def add_error(self, step: str, error: str, detail = ""):
+        """记录一个错误, detail 可以是 traceback 字符串或包含 curl 等信息的字典"""
+        entry = {
             "step": step,
             "error": error,
-            "traceback": traceback_str[:2000],
             "timestamp": int(time.time() * 1000),
-        })
+        }
+        if isinstance(detail, dict):
+            entry.update(detail)
+            if "traceback" in entry and isinstance(entry["traceback"], str):
+                entry["traceback"] = entry["traceback"][:2000]
+        else:
+            entry["traceback"] = str(detail)[:2000]
+        self.errors.append(entry)
         logger.error("── [ERROR:%s] %s", step, error)
 
     def to_dict(self) -> dict:

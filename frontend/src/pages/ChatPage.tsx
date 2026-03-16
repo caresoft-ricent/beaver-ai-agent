@@ -418,7 +418,7 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
               disabled={selectedSessions.size === 0}
             >
               <Button size="small" danger disabled={selectedSessions.size === 0}>
-                \u5220\u9664({selectedSessions.size})
+                {`\u5220\u9664(${selectedSessions.size})`}
               </Button>
             </Popconfirm>
           )}

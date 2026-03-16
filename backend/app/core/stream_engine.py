@@ -698,7 +698,11 @@ def _execute_tool_with_events(
                 return {"events": events, "data": result}
             except Exception as exc:
                 if evidence:
-                    evidence.add_error(f"tool_{tool_name}", str(exc), traceback.format_exc())
+                    curl_cmd = getattr(exc, 'curl', '')
+                    error_detail = {"error": str(exc), "traceback": traceback.format_exc()}
+                    if curl_cmd:
+                        error_detail["curl"] = curl_cmd
+                    evidence.add_error(f"tool_{tool_name}", str(exc), error_detail)
                 mock = api_config.get("mock_response")
                 if mock:
                     data = {"data": mock, "source": "mock"}
@@ -807,6 +811,7 @@ def _execute_tool_with_events(
                 "url": f"{connector.base_url.rstrip('/')}/{action.api_path.lstrip('/')}",
                 "params": params,
                 "param_mapping": param_mapping,
+                "curl": result.get("curl", ""),
             }
             if action.http_method in ("POST", "PUT", "PATCH"):
                 if action.request_template:
@@ -824,7 +829,21 @@ def _execute_tool_with_events(
         return {"events": events, "data": result, "response_description": action.response_description or ""}
     except Exception as exc:
         if evidence:
-            evidence.add_error(f"tool_{tool_name}", str(exc), traceback.format_exc())
+            curl_cmd = getattr(exc, 'curl', '')
+            error_detail = {
+                "error": str(exc),
+                "traceback": traceback.format_exc(),
+            }
+            if curl_cmd:
+                error_detail["curl"] = curl_cmd
+            else:
+                # 尝试构建等效请求信息
+                error_detail["request"] = {
+                    "method": action.http_method if action else "?",
+                    "url": f"{connector.base_url.rstrip('/')}/{action.api_path.lstrip('/')}" if connector and action else "?",
+                    "params": params,
+                }
+            evidence.add_error(f"tool_{tool_name}", str(exc), error_detail)
         return {"events": events, "data": None}
 
 
