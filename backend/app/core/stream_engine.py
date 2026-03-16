@@ -153,7 +153,7 @@ async def _stream_dialog_inner(
             yield evt
         return
 
-    evidence.add_step("intent_recognition", {
+    intent_evidence = {
         "skill": matched_skill.skill_code,
         "skill_name": matched_skill.skill_name,
         "confidence": confidence,
@@ -161,7 +161,14 @@ async def _stream_dialog_inner(
         "match_method": intent_detail.get("match_method", "unknown"),
         "candidates": intent_detail.get("candidates", []),
         "user_message": message,
-    }, int((time.time() - t0) * 1000))
+    }
+    # LLM 交互记录：提示词和返回
+    if intent_detail.get("llm_prompt"):
+        intent_evidence["llm_prompt"] = intent_detail["llm_prompt"]
+    if intent_detail.get("llm_response"):
+        intent_evidence["llm_response"] = intent_detail["llm_response"]
+
+    evidence.add_step("intent_recognition", intent_evidence, int((time.time() - t0) * 1000))
 
     yield agui.custom_event("intent", {
         "code": matched_skill.skill_code,
@@ -196,13 +203,19 @@ async def _stream_dialog_inner(
     entities_after_merge = {**entities}
 
     # LLM 增强抽取
-    llm_entities = _enhanced_entity_extraction(db, tenant_id, message, matched_skill, entities, ctx)
+    llm_entity_result = _enhanced_entity_extraction(db, tenant_id, message, matched_skill, entities, ctx)
+    llm_entities = llm_entity_result.get("entities", {}) if isinstance(llm_entity_result, dict) else {}
     if llm_entities:
         entities = merge_entities(entities, llm_entities)
-        evidence.add_step("llm_entity_extraction", {
+        llm_entity_evidence = {
             "llm_raw": llm_entities,
             "merged_result": {**entities},
-        })
+        }
+        if llm_entity_result.get("_llm_prompt"):
+            llm_entity_evidence["llm_prompt"] = llm_entity_result["_llm_prompt"]
+        if llm_entity_result.get("_llm_response"):
+            llm_entity_evidence["llm_response"] = llm_entity_result["_llm_response"]
+        evidence.add_step("llm_entity_extraction", llm_entity_evidence)
 
     # 参数归一化 (日期、枚举等 + 属性级normalization_config)
     entities_before_normalize = {**entities}
@@ -422,7 +435,7 @@ def _enhanced_entity_extraction(
     db: Session, tenant_id: int, message: str,
     skill: Skill, known_entities: dict, ctx: dict,
 ) -> dict:
-    """LLM 增强实体抽取"""
+    """LLM 增强实体抽取，返回 {entities, _llm_prompt, _llm_response}"""
     llm_config = _get_llm_config(db, tenant_id, "entity") or _get_llm_config(db, tenant_id, "general")
     if not llm_config:
         return {}
@@ -449,7 +462,7 @@ def _enhanced_entity_extraction(
             context=llm_context,
             custom_prompt=skill.entity_extract_prompt or None,
         )
-        return result.get("entities", {})
+        return result
     except Exception:
         return {}
 

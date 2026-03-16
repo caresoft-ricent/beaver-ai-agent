@@ -73,6 +73,7 @@ def call_llm_for_intent(
     available_intents: list[dict],
     context: Optional[dict] = None,
     custom_prompt: Optional[str] = None,
+    last_intent: Optional[str] = None,
 ) -> dict:
     """专门用于意图识别的LLM调用"""
     intents_desc = "\n".join([
@@ -84,6 +85,11 @@ def call_llm_for_intent(
     if context and context.get("current_line"):
         context_str = f"\n当前上下文：正在讨论产线 {context['current_line']}"
 
+    # 上一轮意图上下文：帮助LLM理解对话连续性
+    last_intent_str = ""
+    if last_intent:
+        last_intent_str = f"\n用户上一轮的意图是: {last_intent}。如果用户本轮只提供了补充信息（如公司名、产线号等实体）而没有明确切换话题，应优先沿用上一轮意图。"
+
     if custom_prompt:
         system_prompt = custom_prompt.format(
             intents_desc=intents_desc,
@@ -94,8 +100,12 @@ def call_llm_for_intent(
 
 可选意图：
 {intents_desc}
+{context_str}{last_intent_str}
 
-{context_str}
+规则:
+1. 如果用户输入包含明确的动作词（如"查产线"、"看报告"），按动作词判断意图
+2. 如果用户只输入了实体名称（如公司名、人名），且有上一轮意图，优先沿用上一轮意图
+3. confidence 反映你的确信程度，如果不确定请给较低的值
 
 返回格式（严格JSON）：{{"intent": "意图编码", "confidence": 0.95, "entities": {{}}}}
 其中entities包含从用户输入中提取的实体信息。"""
@@ -121,7 +131,12 @@ def call_llm_for_intent(
     except json.JSONDecodeError:
         parsed = {"intent": "CHITCHAT", "confidence": 0.1, "entities": {}}
 
-    return {**parsed, "tokens_used": result.get("tokens_used", 0)}
+    return {
+        **parsed,
+        "tokens_used": result.get("tokens_used", 0),
+        "_llm_prompt": system_prompt,
+        "_llm_response": result["content"],
+    }
 
 
 def call_llm_for_entities(
@@ -204,4 +219,9 @@ def call_llm_for_entities(
     except json.JSONDecodeError:
         parsed = {"entities": {}}
 
-    return {"entities": parsed.get("entities", {}), "tokens_used": result.get("tokens_used", 0)}
+    return {
+        "entities": parsed.get("entities", {}),
+        "tokens_used": result.get("tokens_used", 0),
+        "_llm_prompt": system_prompt,
+        "_llm_response": result["content"],
+    }

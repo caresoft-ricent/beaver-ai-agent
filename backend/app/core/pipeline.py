@@ -90,6 +90,7 @@ def recognize_intent(
         llm_context = ctx.get("entities") if ctx else None
         if ctx and ctx.get("summary"):
             llm_context = {**(llm_context or {}), "_summary": ctx["summary"]}
+        last_intent = ctx.get("last_intent") if ctx else None
         try:
             llm_result = call_llm_for_intent(
                 provider=llm_config.provider,
@@ -99,6 +100,7 @@ def recognize_intent(
                 user_message=message,
                 available_intents=available_intents,
                 context=llm_context,
+                last_intent=last_intent,
             )
             intent_code = llm_result.get("intent")
             confidence = llm_result.get("confidence", 0)
@@ -110,6 +112,8 @@ def recognize_intent(
                 "llm_entities": entities,
                 "tokens_used": llm_result.get("tokens_used", 0),
                 "candidates": candidates_detail,
+                "llm_prompt": llm_result.get("_llm_prompt", ""),
+                "llm_response": llm_result.get("_llm_response", ""),
             }
             if intent_code and confidence > 0.6:
                 for skill in skills:
