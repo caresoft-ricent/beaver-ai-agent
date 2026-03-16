@@ -2,7 +2,7 @@
 
 > 项目代号：beaver-ai-agent
 > 仓库地址：`git@gitlab.ricent.com:ricent/beaver-ai-agent.git`（main 分支）
-> 最后更新：2026-03-15
+> 最后更新：2026-03-16
 
 ---
 
@@ -37,10 +37,11 @@
 │ ┌─────────────────────────────────────────────────────────┐ │
 │ │ DialogEngine (同步) | StreamEngine (异步SSE)              │ │
 │ ├─────────────────────────────────────────────────────────┤ │
+│ │ Pipeline (共享逻辑: 意图识别/模板/格式化/LLM配置/参数映射) │ │
 │ │ 意图识别 → 实体抽取 → 归一化 → 工具执行 → 回答生成       │ │
 │ │ WorkflowExecutor (有向图流程编排)                         │ │
 │ ├─────────────────────────────────────────────────────────┤ │
-│ │ ContextManager | EvidenceCollector | LLMClient           │ │
+│ │ BeaverSessionScope | ContextManager | EvidenceCollector  │ │
 │ └─────────────────────────────────────────────────────────┘ │
 ├────────────────────┬────────────────────────────────────────┤
 │ SQLAlchemy ORM     │ ConnectorClient (外部调用)              │
@@ -280,6 +281,8 @@ beaver-ai-agent/
 │   │   ├── main.py                 # FastAPI 入口
 │   │   ├── config.py               # 配置读取
 │   │   ├── database.py             # SQLAlchemy 连接
+│   │   ├── kernel/                 # 核心抽象层 (Stage 1+)
+│   │   │   └── scope.py            # BeaverSessionScope 会话作用域
 │   │   ├── models/                 # 数据模型（17 张表）
 │   │   │   ├── tenant.py           # 租户 + API Key
 │   │   │   ├── config.py           # LLM 配置 + 连接器
@@ -294,6 +297,7 @@ beaver-ai-agent/
 │   │   │   ├── admin/              # 管理后台接口（50+端点）
 │   │   │   └── v1/                 # 客户对话接口
 │   │   ├── core/
+│   │   │   ├── pipeline.py         # 共享处理管道 (Stage 0)
 │   │   │   ├── engine.py           # 同步对话引擎
 │   │   │   ├── stream_engine.py    # 流式对话引擎 (AG-UI SSE)
 │   │   │   └── workflow_engine.py  # 流程编排执行引擎
@@ -301,6 +305,10 @@ beaver-ai-agent/
 │   │       ├── llm_client.py       # LLM 调用封装
 │   │       ├── connector_client.py # 连接器调用封装
 │   │       └── beaver_cloud.py     # 河狸云 API 专用客户端
+│   ├── tests/                      # 自动化测试 (Stage 0+)
+│   │   ├── conftest.py             # 测试基础设施 + Factory
+│   │   ├── test_01~05_*.py         # 40 个金样例测试
+│   │   └── test_06_scope.py        # Scope 提取 + 引擎集成测试
 │   ├── scripts/
 │   │   └── seed_demo.py            # 演示数据脚本（幂等）
 │   ├── alembic/                    # 数据库迁移
@@ -456,14 +464,62 @@ alembic upgrade head
 
 ---
 
-## 十、后续规划
+## 十、架构改造进度（AI-Kernel 路线图）
+
+### 10.1 改造总览
+
+| 阶段 | 名称 | 目标 | 状态 |
+|------|------|------|------|
+| Stage 0 | Pipeline 抽取 | 测试安全网 + 消除重复代码 | ✅ 完成 |
+| Stage 1 | Scope 接入 | 让系统知道「谁在哪个企业做什么」 | ✅ 完成 |
+| Stage 2 | Capability 注册 | 统一能力注册体系 | ⬜ 待启动 |
+| Stage 3 | Policy Guard | 安全执行策略 | ⬜ 待启动 |
+| Stage 4 | Orchestrator 升级 | 智能编排引擎 | ⬜ 待启动 |
+
+详细行动计划：`docs/updates/2026-0316-action-plan.md`
+
+### 10.2 Stage 0：Pipeline 抽取（2026-03-16）
+
+- 新增 `pipeline.py`：5 个共享函数从双引擎抽取
+- 新增 `tests/`：40 个金样例测试全部通过（0.73s）
+- stream_engine.py 和 engine.py 委托 pipeline
+- 详细文档：`docs/updates/2026-0316-stage0-pipeline-extraction.md`
+
+### 10.3 Stage 1：Scope 接入（2026-03-16）
+
+- 新增 `kernel/scope.py`：`BeaverSessionScope` 数据类
+- `extract_scope(request)` 从 HTTP Header 提取企业上下文
+- 双引擎和证据链均接收 Scope 参数
+- 证据链自动记录 enterprise_id / ouid / org_id
+- 新增 17 个 Scope 测试，总测试 57 个全部通过（0.83s）
+- 详细文档：`docs/updates/2026-0316-stage1-scope.md`
+
+### 10.4 BeaverSessionScope 数据结构
+
+| 字段 | 类型 | 来源 | 说明 |
+|------|------|------|------|
+| ouid | str | Header Ouid | 全局用户 ID |
+| enterprise_id | str | Header Enterpriseid | 企业编码（RYSGS/BLOGI） |
+| member_id | str | Header Memberid | 成员 ID |
+| org_id | str | Header Orgid | 组织 ID |
+| token | str | Header Authorization | JWT（去掉 Bearer） |
+| current_module | str | Referer URL 解析 | 当前模块（service/list） |
+| tenant_id | int? | 内部映射 | 兼容现有 int 体系 |
+| display_name | str | 缓存补充 | 用户显示名 |
+| enterprise_name | str | 缓存补充 | 企业名称 |
+
+---
+
+## 十一、后续规划
 
 | 优先级 | 任务 | 说明 |
 |--------|------|------|
 | P0 | 对接河狸云真实 API | 需要河狸云团队提供 API Key，详见对接指南 |
 | P0 | 接入真实 LLM | 配置 API Key 后意图识别和回复将由大模型处理 |
+| P0 | Stage 2: Capability 注册 | 统一能力注册体系，声明式能力定义 |
+| P1 | Stage 3: Policy Guard | 写操作确认、权限校验、前置条件 |
 | P1 | 投诉/反馈技能 | 新增投诉提交、返修申请等写操作技能 |
-| P2 | 权限体系 | 基于租户的权限控制，API Key 鉴权 |
+| P2 | Stage 4: Orchestrator 升级 | 智能编排、多步推理 |
 | P2 | 流程编排调试模式 | 可视化单步执行 + 变量查看 |
 | P3 | 监控报表 | 对话量 / 意图分布 / 响应时间等运营数据 |
 | P3 | 版本历史 | 流程编排文件的版本对比与回滚 |

@@ -12,13 +12,16 @@ from app.schemas.common import ResponseBase
 from app.core.engine import DialogEngine
 from app.core.stream_engine import stream_dialog
 from app.core import agui
+from app.kernel.scope import BeaverSessionScope, extract_scope
 
 router = APIRouter()
 
 
 @router.post("/completions")
-def chat_completions(req: ChatRequest, db: Session = Depends(get_db)):
+def chat_completions(req: ChatRequest, request: Request, db: Session = Depends(get_db)):
     """对话主接口"""
+    scope = extract_scope(request)
+    scope.tenant_id = req.tenant_id
     start_time = time.time()
 
     # 获取或创建会话
@@ -46,7 +49,7 @@ def chat_completions(req: ChatRequest, db: Session = Depends(get_db)):
     db.flush()
 
     # 调用对话引擎
-    engine = DialogEngine(db=db, tenant_id=req.tenant_id, customer_id=req.customer_id)
+    engine = DialogEngine(db=db, tenant_id=req.tenant_id, customer_id=req.customer_id, scope=scope)
     result = engine.process(
         session_id=session.session_id,
         message=req.message,
@@ -118,6 +121,9 @@ async def chat_stream(req: AGUIStreamRequest, request: Request, db: Session = De
     db.add(user_msg)
     db.commit()
 
+    scope = extract_scope(request)
+    scope.tenant_id = tenant_id
+
     thread_id = session.session_id
     run_id = req.run_id or agui.new_id()
 
@@ -137,6 +143,7 @@ async def chat_stream(req: AGUIStreamRequest, request: Request, db: Session = De
             message=message,
             thread_id=thread_id,
             run_id=run_id,
+            scope=scope,
         ):
             # 拦截内容用于存库
             if '"TEXT_MESSAGE_CONTENT"' in event_str:
@@ -191,7 +198,8 @@ async def chat_stream(req: AGUIStreamRequest, request: Request, db: Session = De
 @router.post("/actions")
 def execute_action(req: ActionRequest, db: Session = Depends(get_db)):
     """动作执行接口"""
-    engine = DialogEngine(db=db, tenant_id=req.tenant_id, customer_id=req.customer_id)
+    engine = DialogEngine(db=db, tenant_id=req.tenant_id, customer_id=req.customer_id,
+                          scope=BeaverSessionScope())
     result = engine.execute_action(
         session_id=req.session_id,
         action=req.action,

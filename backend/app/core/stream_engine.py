@@ -32,6 +32,7 @@ from app.core.context_manager import (
 from app.core.evidence import EvidenceCollector
 from app.core.workflow_engine import WorkflowExecutor
 from app.core import pipeline
+from app.kernel.scope import BeaverSessionScope
 
 logger = logging.getLogger("beaver.engine")
 
@@ -44,10 +45,12 @@ async def stream_dialog(
     message: str,
     thread_id: str,
     run_id: str,
+    scope: BeaverSessionScope = None,
 ) -> AsyncGenerator[str, None]:
     """主入口 - 流式返回 AG-UI SSE 事件"""
+    scope = scope or BeaverSessionScope()
 
-    evidence = EvidenceCollector(session_id, tenant_id, customer_id)
+    evidence = EvidenceCollector(session_id, tenant_id, customer_id, scope=scope)
     yield agui.run_started(thread_id, run_id)
 
     try:

@@ -29,14 +29,17 @@ def _safe_json(obj: Any, max_len: int = 2000) -> str:
 class EvidenceCollector:
     """在一次对话处理中收集证据链，并同步输出到 logger"""
 
-    def __init__(self, session_id: str, tenant_id: int, customer_id: str):
+    def __init__(self, session_id: str, tenant_id: int, customer_id: str,
+                 scope=None):
         self.session_id = session_id
         self.tenant_id = tenant_id
         self.customer_id = customer_id
+        self.scope = scope
         self.steps: list[dict] = []
         self.errors: list[dict] = []
         self.start_time = time.time()
-        logger.info("═══ 对话链路开始 ═══ session=%s customer=%s", session_id, customer_id)
+        scope_info = f" enterprise={scope.enterprise_id}" if scope and scope.enterprise_id else ""
+        logger.info("═══ 对话链路开始 ═══ session=%s customer=%s%s", session_id, customer_id, scope_info)
 
     def add_step(self, step: str, detail: Any = None, duration_ms: int = 0):
         """记录一个处理步骤，同时输出到日志"""
@@ -60,12 +63,21 @@ class EvidenceCollector:
 
     def to_dict(self) -> dict:
         """输出证据链字典"""
-        return {
+        result = {
             "session_id": self.session_id,
             "total_duration_ms": int((time.time() - self.start_time) * 1000),
             "steps": self.steps,
             "errors": self.errors,
         }
+        if self.scope and self.scope.is_authenticated:
+            result["scope"] = {
+                "enterprise_id": self.scope.enterprise_id,
+                "ouid": self.scope.ouid,
+                "member_id": self.scope.member_id,
+                "org_id": self.scope.org_id,
+                "current_module": self.scope.current_module,
+            }
+        return result
 
     def save_action_log(self, db: Session, action_type: str, params: dict = None,
                         status: str = "success", result: dict = None, error_message: str = None):

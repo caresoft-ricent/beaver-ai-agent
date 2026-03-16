@@ -19,6 +19,7 @@ from app.core.context_manager import (
 )
 from app.core.evidence import EvidenceCollector
 from app.core import pipeline
+from app.kernel.scope import BeaverSessionScope
 
 
 class EngineResult(dict):
@@ -36,15 +37,17 @@ class EngineResult(dict):
 class DialogEngine:
     """配置驱动的对话引擎"""
 
-    def __init__(self, db: Session, tenant_id: int, customer_id: str):
+    def __init__(self, db: Session, tenant_id: int, customer_id: str,
+                 scope: BeaverSessionScope = None):
         self.db = db
         self.tenant_id = tenant_id
         self.customer_id = customer_id
+        self.scope = scope or BeaverSessionScope()
 
     def process(self, session_id: str, message: str) -> EngineResult:
         """主处理流程"""
         result = EngineResult(reply="", reply_type="text")
-        evidence = EvidenceCollector(session_id, self.tenant_id, self.customer_id)
+        evidence = EvidenceCollector(session_id, self.tenant_id, self.customer_id, scope=self.scope)
 
         # Step 1: 加载上下文
         ctx = load_context(self.db, session_id)
