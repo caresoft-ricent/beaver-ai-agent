@@ -306,6 +306,7 @@ async def _stream_dialog_inner(
     t0 = time.time()
 
     query_results = {}
+    response_descriptions = []  # 收集各操作的响应数据说明
     max_calls = getattr(matched_skill, 'max_tool_calls', 10) or 10
     for idx, tool in enumerate(tools):
         if idx >= max_calls:
@@ -316,6 +317,8 @@ async def _stream_dialog_inner(
             yield evt
         if tool_result["data"]:
             query_results[f"tool_{tool.order_no}"] = tool_result["data"]
+        if tool_result.get("response_description"):
+            response_descriptions.append(tool_result["response_description"])
 
     evidence.add_step("tool_execution", {
         "tools_count": len(tools),
@@ -343,7 +346,9 @@ async def _stream_dialog_inner(
     elif query_results:
         llm_config = _get_llm_config(db, tenant_id, "response")
         if llm_config:
-            async for evt in _stream_llm_reply(llm_config, message, matched_skill, query_results):
+            # 合并响应数据说明，提供给LLM理解字段含义
+            data_desc = "\n".join(response_descriptions) if response_descriptions else None
+            async for evt in _stream_llm_reply(llm_config, message, matched_skill, query_results, data_desc):
                 yield evt
             evidence.add_step("reply_generation", {
                 "method": "llm",
@@ -850,8 +855,9 @@ def _execute_tool_with_events(
                 },
                 "response_preview": str(data_preview)[:500],
                 "aggregated": result.get("aggregated"),
+                "has_response_description": bool(action.response_description),
             }, int((time.time() - t0) * 1000))
-        return {"events": events, "data": result}
+        return {"events": events, "data": result, "response_description": action.response_description or ""}
     except Exception as exc:
         if evidence:
             evidence.add_error(f"tool_{tool_name}", str(exc), traceback.format_exc())
@@ -859,12 +865,15 @@ def _execute_tool_with_events(
 
 
 async def _stream_llm_reply(
-    llm_config: LLMConfig, message: str, skill: Skill, data: dict
+    llm_config: LLMConfig, message: str, skill: Skill, data: dict,
+    response_description: str = None,
 ) -> AsyncGenerator[str, None]:
     """用 LLM 流式生成回答"""
     import httpx
 
     prompt = skill.response_prompt or "请根据以下数据，用友好的中文回答用户的问题。"
+    if response_description:
+        prompt += f"\n\n以下是数据字段说明，请据此将编码/数字转为可读的业务名称：\n{response_description}"
     data_str = json.dumps(data, ensure_ascii=False, indent=2)
 
     url = llm_config.api_url.rstrip("/")

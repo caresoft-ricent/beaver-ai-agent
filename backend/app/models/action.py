@@ -27,6 +27,7 @@ class Action(Base):
     api_path = Column(String(512), comment="API路径(相对于连接器base_url)")
     request_template = Column(JSON, comment="请求模板(JSON)")
     response_mapping = Column(JSON, comment="响应映射(JSON): 将API返回映射到本体属性")
+    response_description = Column(Text, comment="响应数据说明: 描述API返回字段的业务含义，如枚举值映射等，提交给LLM辅助生成回复")
     cache_ttl = Column(Integer, default=0, comment="缓存时间(秒), 0=不缓存")
     mock_response = Column(JSON, comment="Mock响应数据(JSON)")
     created_at = Column(DateTime, server_default=func.now())

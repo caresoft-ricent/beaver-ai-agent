@@ -47,7 +47,7 @@ interface PropertyItem {
   normalization_config?: Record<string, unknown>;
   mapping_config?: Record<string, unknown>;
 }
-interface ActionItem { id: number; entity_id: number; tenant_id: number; connector_id?: number; action_code: string; action_name: string; action_description?: string; category?: string; http_method: string; api_path?: string; request_template?: Record<string, unknown>; response_mapping?: Record<string, unknown>; cache_ttl?: number; mock_response?: Record<string, unknown>; tags?: string[]; }
+interface ActionItem { id: number; entity_id: number; tenant_id: number; connector_id?: number; action_code: string; action_name: string; action_description?: string; category?: string; http_method: string; api_path?: string; request_template?: Record<string, unknown>; response_mapping?: Record<string, unknown>; response_description?: string; cache_ttl?: number; mock_response?: Record<string, unknown>; tags?: string[]; }
 interface ActionParameterItem { id: number; action_id: number; property_id?: number; name: string; source_property?: string; type: string; title?: string; param_description?: string; is_input: boolean; is_output: boolean; is_required: boolean; default_value?: string; value_type: string; }
 
 const modeIcon: Record<string, React.ReactNode> = {
@@ -700,6 +700,9 @@ export default function EntityList() {
                   </Form.Item>
                   <Form.Item name="response_mapping" label="响应映射(JSON)" tooltip="将API响应字段映射到本体属性">
                     <Input.TextArea rows={3} placeholder={'如: {"items": "data.records", "name": "lineName"}'} />
+                  </Form.Item>
+                  <Form.Item name="response_description" label="响应数据说明" tooltip="描述API返回字段的业务含义（如枚举值映射），提交给大模型辅助生成回复">
+                    <Input.TextArea rows={4} placeholder={'描述接口返回数据中各字段含义，例如:\nstageStatus: 阶段状态（2=进行中, 8=已完成, 32=特殊处理）\nstageFullName: 阶段全称/产线名称\nid: 产线编号'} />
                   </Form.Item>
                   <Form.Item name="mock_response" label="Mock响应(JSON)" tooltip="Mock模式下返回的模拟数据">
                     <Input.TextArea rows={3} placeholder={'如: {"code": 200, "data": [{"id":1, "name":"产线1"}]}'} />

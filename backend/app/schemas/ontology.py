@@ -146,6 +146,7 @@ class ActionCreate(BaseModel):
     api_path: Optional[str] = None
     request_template: Optional[dict] = None
     response_mapping: Optional[dict] = None
+    response_description: Optional[str] = None
     cache_ttl: int = 0
     mock_response: Optional[dict] = None
 
@@ -162,6 +163,7 @@ class ActionUpdate(BaseModel):
     api_path: Optional[str] = None
     request_template: Optional[dict] = None
     response_mapping: Optional[dict] = None
+    response_description: Optional[str] = None
     cache_ttl: Optional[int] = None
     mock_response: Optional[dict] = None
 
@@ -180,6 +182,7 @@ class ActionOut(BaseModel):
     api_path: Optional[str]
     request_template: Optional[dict] = None
     response_mapping: Optional[dict] = None
+    response_description: Optional[str] = None
     cache_ttl: int
     mock_response: Optional[dict] = None
     created_at: Optional[datetime]
