@@ -626,15 +626,20 @@ def _execute_tool_with_events(
                     tc_id, json.dumps(result, ensure_ascii=False, default=str)
                 ))
                 if evidence:
+                    method = api_config.get("http_method", "GET")
+                    req_detail = {
+                        "method": method,
+                        "url": f"{connector.base_url.rstrip('/')}/{api_config.get('api_path', '').lstrip('/')}",
+                        "params": params,
+                    }
+                    if method in ("POST", "PUT", "PATCH"):
+                        tmpl = api_config.get("request_template")
+                        req_detail["body"] = tmpl if tmpl else params
                     evidence.add_step(f"tool_{tool_name}", {
                         "source": result.get("source", "api"),
                         "status_code": result.get("status_code"),
                         "response_time_ms": result.get("response_time_ms"),
-                        "request": {
-                            "method": api_config.get("http_method", "GET"),
-                            "path": api_config.get("api_path", ""),
-                            "params_keys": list(params.keys()),
-                        },
+                        "request": req_detail,
                     }, int((time.time() - t0) * 1000))
                 return {"events": events, "data": result}
             except Exception as exc:
@@ -743,21 +748,24 @@ def _execute_tool_with_events(
                     items = inner
                 if isinstance(items, list):
                     data_preview = f"[{len(items)} items]"
+            req_detail = {
+                "method": action.http_method,
+                "url": f"{connector.base_url.rstrip('/')}/{action.api_path.lstrip('/')}",
+                "params": params,
+                "param_mapping": param_mapping,
+            }
+            if action.http_method in ("POST", "PUT", "PATCH"):
+                if action.request_template:
+                    req_detail["body"] = action.request_template
+                else:
+                    req_detail["body"] = params
             evidence.add_step(f"tool_{tool_name}", {
                 "source": result.get("source", "api"),
                 "status_code": result.get("status_code"),
                 "response_time_ms": result.get("response_time_ms"),
-                "request": {
-                    "method": action.http_method,
-                    "path": action.api_path,
-                    "params_keys": list(params.keys()),
-                    "has_template": bool(action.request_template),
-                    "has_response_mapping": bool(action.response_mapping),
-                    "param_mapping": param_mapping,
-                },
+                "request": req_detail,
                 "response_preview": str(data_preview)[:500],
                 "aggregated": result.get("aggregated"),
-                "has_response_description": bool(action.response_description),
             }, int((time.time() - t0) * 1000))
         return {"events": events, "data": result, "response_description": action.response_description or ""}
     except Exception as exc:

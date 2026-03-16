@@ -43,11 +43,12 @@ class DialogEngine:
         self.tenant_id = tenant_id
         self.customer_id = customer_id
         self.scope = scope or BeaverSessionScope()
+        self.evidence = None
 
     def process(self, session_id: str, message: str) -> EngineResult:
         """主处理流程"""
         result = EngineResult(reply="", reply_type="text")
-        evidence = EvidenceCollector(session_id, self.tenant_id, self.customer_id, scope=self.scope)
+        self.evidence = EvidenceCollector(session_id, self.tenant_id, self.customer_id, scope=self.scope)
 
         # Step 1: 加载上下文
         ctx = load_context(self.db, session_id)
@@ -158,6 +159,7 @@ class DialogEngine:
         # ── 模式1: 接口调用直接包装(api_config) ──
         api_config = tool.config.get("api_config") if tool.config else None
         if api_config and tool.tools_mode == "api":
+            tool_name = api_config.get("name", f"api_tool_{tool.order_no}")
             params = {**entities, "customer_id": self.customer_id}
             connector_id = api_config.get("connector_id")
             connector = (
@@ -176,7 +178,7 @@ class DialogEngine:
                 "mock_enabled": connector.mock_enabled,
             })
             try:
-                return client.call_action(
+                result = client.call_action(
                     action_config={
                         "http_method": api_config.get("http_method", "GET"),
                         "api_path": api_config.get("api_path", ""),
@@ -186,7 +188,27 @@ class DialogEngine:
                     params=params,
                     mock_response=api_config.get("mock_response"),
                 )
-            except Exception:
+                if self.evidence:
+                    method = api_config.get("http_method", "GET")
+                    req_detail = {
+                        "method": method,
+                        "url": f"{connector.base_url.rstrip('/')}/{api_config.get('api_path', '').lstrip('/')}",
+                        "params": params,
+                    }
+                    if method in ("POST", "PUT", "PATCH"):
+                        tmpl = api_config.get("request_template")
+                        req_detail["body"] = tmpl if tmpl else params
+                    self.evidence.add_step(f"tool_{tool_name}", {
+                        "source": result.get("source", "api"),
+                        "status_code": result.get("status_code"),
+                        "response_time_ms": result.get("response_time_ms"),
+                        "request": req_detail,
+                    })
+                return result
+            except Exception as exc:
+                if self.evidence:
+                    import traceback
+                    self.evidence.add_error(f"tool_{tool_name}", str(exc), traceback.format_exc())
                 mock = api_config.get("mock_response")
                 return {"data": mock, "source": "mock_fallback"} if mock else None
 
@@ -203,6 +225,8 @@ class DialogEngine:
             action = self.db.query(Action).filter(Action.entity_id == entity.id).first()
         if not action:
             return None
+
+        tool_name = f"{entity.entity_code}.{action.action_code}" if entity else action.action_code
 
         # 获取连接器 — 优先从操作自身的connector_id取, 其次从本体取
         connector = None
@@ -233,7 +257,7 @@ class DialogEngine:
         })
 
         try:
-            return client.call_action(
+            result = client.call_action(
                 action_config={
                     "http_method": action.http_method,
                     "api_path": action.api_path,
@@ -244,7 +268,36 @@ class DialogEngine:
                 mock_response=action.mock_response,
                 param_mapping=param_mapping,
             )
-        except Exception:
+            if self.evidence:
+                req_detail = {
+                    "method": action.http_method,
+                    "url": f"{connector.base_url.rstrip('/')}/{action.api_path.lstrip('/')}",
+                    "params": params,
+                    "param_mapping": param_mapping,
+                }
+                if action.http_method in ("POST", "PUT", "PATCH"):
+                    if action.request_template:
+                        req_detail["body"] = action.request_template
+                    else:
+                        req_detail["body"] = params
+                data_preview = result.get("data")
+                if isinstance(data_preview, dict):
+                    inner = data_preview.get("data", data_preview)
+                    items = inner.get("items") if isinstance(inner, dict) else (inner if isinstance(inner, list) else None)
+                    if isinstance(items, list):
+                        data_preview = f"[{len(items)} items]"
+                self.evidence.add_step(f"tool_{tool_name}", {
+                    "source": result.get("source", "api"),
+                    "status_code": result.get("status_code"),
+                    "response_time_ms": result.get("response_time_ms"),
+                    "request": req_detail,
+                    "response_preview": str(data_preview)[:500],
+                })
+            return result
+        except Exception as exc:
+            if self.evidence:
+                import traceback
+                self.evidence.add_error(f"tool_{tool_name}", str(exc), traceback.format_exc())
             return None
 
     def _build_param_mapping(self, action_id: int) -> Optional[dict]:

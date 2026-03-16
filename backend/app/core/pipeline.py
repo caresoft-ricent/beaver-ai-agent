@@ -123,6 +123,16 @@ def recognize_intent(
                 "candidates": candidates_detail,
             }
 
+    # 跟随上文：规则和LLM都未匹配时, 如果上下文有前一意图, 沿用它(追问场景)
+    if ctx and ctx.get("last_intent"):
+        for skill in skills:
+            if skill.skill_code == ctx["last_intent"]:
+                return skill, 0.5, {}, {
+                    "match_method": "continuation",
+                    "prev_intent": ctx["last_intent"],
+                    "candidates": candidates_detail,
+                }
+
     return None, 0, {}, {"match_method": "none", "candidates": candidates_detail}
 
 
