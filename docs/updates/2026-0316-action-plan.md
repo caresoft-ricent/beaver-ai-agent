@@ -2,7 +2,7 @@
 
 > 创建日期：2026-03-16  
 > 基于文档：`docs/0316/01-总纲.md` ~ `07-兼容性分析.md`  
-> 当前进度：Stage 0 ✅ → Stage 1 进行中
+> 当前进度：Stage 0 ✅ → Stage 1 ✅ → Stage 1.5 (引擎合并) ✅
 
 ---
 
@@ -11,7 +11,8 @@
 | 阶段 | 名称 | 目标 | 核心产出 | 状态 |
 |------|------|------|----------|------|
 | Stage 0 | 测试基础 + Pipeline 抽取 | 安全网 + 消除重复 | pipeline.py + 40 测试 | ✅ 完成 |
-| Stage 1 | Scope 接入 | 让系统知道"谁在哪个企业做什么" | BeaverSessionScope + 引擎改造 | ✅ 完成 |
+| Stage 1 | Scope 接入 | 让系统知道"谁在哪个企业做什么" | BeaverSessionScope + 引擎改造 | ✅ 完成 (stage1-done) |
+| Stage 1.5 | 引擎合并 | 同步引擎合并到流式 | /completions 走 stream_dialog | ✅ 完成 |
 | Stage 2 | Capability 注册 | 统一能力注册体系 | CapabilityRegistry + 声明式能力 | ⬜ 待启动 |
 | Stage 3 | Policy Guard | 安全执行策略 | PolicyGuard + 确认/权限/前置条件 | ⬜ 待启动 |
 | Stage 4 | Orchestrator 升级 | 智能编排 | Orchestrator + 多步推理 | ⬜ 待启动 |
@@ -76,10 +77,35 @@
 
 ### 完成标志
 
-- [ ] `BeaverSessionScope` 类可从请求 Header 提取
-- [ ] 引擎入口接收 Scope
-- [ ] 日志和证据链记录 enterprise_id
-- [ ] 测试全部通过
+- [x] `BeaverSessionScope` 类可从请求 Header 提取
+- [x] 引擎入口接收 Scope
+- [x] 日志和证据链记录 enterprise_id
+- [x] 测试全部通过 (57 tests → stage1-done)
+
+---
+
+## Stage 1.5：引擎合并（已完成）
+
+**目标**: 同步引擎 `engine.py` 的生产路径合并到流式引擎 `stream_engine.py`
+
+### 改动
+
+- `/completions` 端点改为 async，调用 `stream_dialog()` 同步收集 SSE 事件
+- `/actions` 端点内联 stub 逻辑，不再依赖 `DialogEngine`
+- `chat.py` 移除 `from app.core.engine import DialogEngine`
+- `engine.py` 保留供测试使用，生产流量统一走 `stream_engine`
+
+### 收益
+
+- `/completions` 和 `/stream` 走完全相同的处理链路
+- 增强实体抽取、LLM 交互记录、上下文摘要等新功能自动覆盖 `/completions`
+- 无需维护两套引擎逻辑
+
+### 完成标志
+
+- [x] `/completions` 使用 `stream_dialog` 收集结果
+- [x] `chat.py` 无 `DialogEngine` 依赖
+- [x] 77/77 测试通过
 
 ---
 

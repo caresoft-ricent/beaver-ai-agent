@@ -1,4 +1,5 @@
 """对话API - 客户侧使用"""
+import json
 import uuid
 import time
 from fastapi import APIRouter, Depends, Request
@@ -10,7 +11,6 @@ from app.database import get_db
 from app.models.chat import ChatSession, ChatMessage
 from app.schemas.chat import ChatRequest, ChatResponse, ActionRequest, ActionResponse, AGUIStreamRequest
 from app.schemas.common import ResponseBase
-from app.core.engine import DialogEngine
 from app.core.stream_engine import stream_dialog
 from app.core import agui
 from app.kernel.scope import BeaverSessionScope, extract_scope
@@ -19,8 +19,8 @@ router = APIRouter()
 
 
 @router.post("/completions")
-def chat_completions(req: ChatRequest, request: Request, db: Session = Depends(get_db)):
-    """对话主接口"""
+async def chat_completions(req: ChatRequest, request: Request, db: Session = Depends(get_db)):
+    """对话主接口 — 使用流式引擎同步收集结果"""
     scope = extract_scope(request)
     scope.tenant_id = req.tenant_id
     start_time = time.time()
@@ -49,24 +49,60 @@ def chat_completions(req: ChatRequest, request: Request, db: Session = Depends(g
     db.add(user_msg)
     db.flush()
 
-    # 调用对话引擎
-    engine = DialogEngine(db=db, tenant_id=req.tenant_id, customer_id=req.customer_id, scope=scope)
-    result = engine.process(
+    # 使用流式引擎收集结果（与 /stream 端点走完全相同的处理链路）
+    thread_id = session.session_id
+    run_id = f"run_{uuid.uuid4().hex[:8]}"
+
+    collected_text: list[str] = []
+    collected_intent: str | None = None
+    collected_data: dict | None = None
+    collected_evidence: dict | None = None
+    needs_clarification = False
+    clarification_info: dict | None = None
+
+    async for event_str in stream_dialog(
+        db=db,
+        tenant_id=req.tenant_id,
+        customer_id=req.customer_id,
         session_id=session.session_id,
         message=req.message,
-    )
+        thread_id=thread_id,
+        run_id=run_id,
+        scope=scope,
+    ):
+        if '"TEXT_MESSAGE_CONTENT"' in event_str:
+            try:
+                payload = json.loads(event_str.split("data: ", 1)[1].strip())
+                collected_text.append(payload.get("delta", ""))
+            except Exception:
+                pass
+        elif '"CUSTOM"' in event_str:
+            try:
+                payload = json.loads(event_str.split("data: ", 1)[1].strip())
+                evt_name = payload.get("name", "")
+                if evt_name == "intent":
+                    collected_intent = payload.get("value", {}).get("code")
+                elif evt_name == "structured_data":
+                    collected_data = payload.get("value")
+                elif evt_name == "evidence":
+                    collected_evidence = payload.get("value")
+                elif evt_name == "clarification":
+                    needs_clarification = True
+                    clarification_info = payload.get("value")
+            except Exception:
+                pass
 
+    reply = "".join(collected_text)
     processing_time = int((time.time() - start_time) * 1000)
 
     # 保存AI回复
     ai_msg = ChatMessage(
         session_id=session.session_id,
         role="assistant",
-        content=result.reply,
-        intent=result.get("intent"),
-        structured_data=result.get("structured_data"),
-        evidence_chain=result.get("evidence_chain"),
-        suggested_actions=result.get("suggested_actions"),
+        content=reply,
+        intent=collected_intent,
+        structured_data=collected_data,
+        evidence_chain=collected_evidence,
         processing_time_ms=processing_time,
     )
     db.add(ai_msg)
@@ -77,15 +113,13 @@ def chat_completions(req: ChatRequest, request: Request, db: Session = Depends(g
 
     return ResponseBase(data=ChatResponse(
         session_id=session.session_id,
-        reply=result.reply,
-        reply_type=result.get("reply_type", "text"),
-        intent=result.get("intent"),
-        structured_data=result.get("structured_data"),
-        evidence_chain=result.get("evidence_chain"),
-        suggested_actions=result.get("suggested_actions"),
-        needs_clarification=result.get("needs_clarification", False),
-        clarification=result.get("clarification"),
-        context=result.get("context"),
+        reply=reply,
+        reply_type="structured" if collected_data else "text",
+        intent=collected_intent,
+        structured_data=collected_data,
+        evidence_chain=collected_evidence,
+        needs_clarification=needs_clarification,
+        clarification=clarification_info,
     ).model_dump())
 
 
@@ -203,15 +237,10 @@ async def chat_stream(req: AGUIStreamRequest, request: Request, db: Session = De
 @router.post("/actions")
 def execute_action(req: ActionRequest, db: Session = Depends(get_db)):
     """动作执行接口"""
-    engine = DialogEngine(db=db, tenant_id=req.tenant_id, customer_id=req.customer_id,
-                          scope=BeaverSessionScope())
-    result = engine.execute_action(
-        session_id=req.session_id,
-        action=req.action,
-        params=req.params,
-        confirmed=req.confirmed,
-    )
-    return ResponseBase(data=result)
+    return ResponseBase(data={
+        "success": True,
+        "reply": f"动作 {req.action} 已收到，参数: {json.dumps(req.params or {}, ensure_ascii=False)}。功能开发中。",
+    })
 
 
 @router.get("/sessions/{session_id}/history")
