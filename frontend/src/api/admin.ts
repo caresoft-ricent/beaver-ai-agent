@@ -14,6 +14,9 @@ export const changePassword = (data: { old_password: string; new_password: strin
 export const deleteSession = (sessionId: string) =>
   client.delete(`/v1/chat/sessions/${sessionId}`);
 
+export const batchDeleteSessions = (sessionIds: string[]) =>
+  client.post('/v1/chat/sessions/batch-delete', { session_ids: sessionIds });
+
 // Tenants
 export const getTenants = (params?: { page?: number; size?: number }) =>
   client.get('/admin/tenants', { params });

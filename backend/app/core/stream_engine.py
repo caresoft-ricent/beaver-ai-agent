@@ -187,6 +187,10 @@ async def _stream_dialog_inner(
     yield agui.step_started("entity_extraction")
     t0 = time.time()
 
+    # LLM意图识别返回的实体键名自由(如"company"), 映射为规范参数名(如"customerName")
+    if intent_detail.get("match_method") == "llm" and rule_entities:
+        rule_entities = _remap_intent_entities(db, matched_skill, rule_entities)
+
     # 合并: 上下文旧实体 + 规则抽取的新实体
     entities = merge_entities(ctx.get("entities", {}), rule_entities)
     entities_after_merge = {**entities}
@@ -529,6 +533,56 @@ def _get_entity_definitions(db: Session, skill: Skill) -> list:
                         "action_description": action_desc or "",
                     })
     return defs
+
+
+def _remap_intent_entities(db: Session, skill: Skill, raw_entities: dict) -> dict:
+    """将LLM意图识别返回的自由键名实体映射为技能的规范参数名。
+
+    LLM意图识别返回的实体键名不受约束(如 "company"),
+    这里将其重新映射到技能实际定义的参数名(如 "customerName")。
+    """
+    if not raw_entities:
+        return raw_entities
+
+    # 收集本技能定义的参数名
+    param_names = set()
+    tools = (
+        db.query(SkillTool)
+        .filter(SkillTool.skill_id == skill.id)
+        .all()
+    )
+    for tool in tools:
+        if tool.action_id:
+            params = (
+                db.query(ActionParameter)
+                .filter(ActionParameter.action_id == tool.action_id, ActionParameter.is_input == True)
+                .all()
+            )
+            for ap in params:
+                param_names.add(ap.source_property or ap.name)
+
+    if not param_names:
+        return raw_entities
+
+    # 已经匹配的键直接保留，未匹配的尝试映射到唯一候选参数
+    remapped = {}
+    unmatched_keys = []
+    for k, v in raw_entities.items():
+        if k in param_names:
+            remapped[k] = v
+        else:
+            unmatched_keys.append((k, v))
+
+    # 对于未匹配的实体键，如果只有一个尚未填充的参数名，则直接映射
+    unfilled = param_names - set(remapped.keys())
+    if len(unmatched_keys) == 1 and len(unfilled) == 1:
+        remapped[unfilled.pop()] = unmatched_keys[0][1]
+    elif unmatched_keys:
+        # 多个未匹配: 按值保留(不丢弃)，后续LLM增强抽取会处理
+        for k, v in unmatched_keys:
+            remapped[k] = v
+
+    return remapped
 
 
 def _apply_output_aggregation(db: Session, action_id: int, result: dict) -> dict:

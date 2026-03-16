@@ -3,6 +3,7 @@ import uuid
 import time
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -181,7 +182,11 @@ async def chat_stream(req: AGUIStreamRequest, request: Request, db: Session = De
                 evidence_chain=collected_evidence,
             )
             db.add(ai_msg)
-            session.message_count = (session.message_count or 0) + 2
+            # 使用原子 SQL UPDATE 避免 ORM 对象在异步生成器中失效导致 message_count 始终为 0
+            db.execute(
+                text("UPDATE ai_chat_session SET message_count = message_count + 2 WHERE session_id = :sid"),
+                {"sid": session.session_id},
+            )
             db.commit()
 
     return StreamingResponse(
@@ -242,6 +247,18 @@ def delete_session(session_id: str, db: Session = Depends(get_db)):
     db.delete(session)
     db.commit()
     return ResponseBase(message="会话已删除")
+
+
+@router.post("/sessions/batch-delete")
+def batch_delete_sessions(req: dict, db: Session = Depends(get_db)):
+    """批量删除会话及其所有消息"""
+    session_ids = req.get("session_ids", [])
+    if not session_ids:
+        return ResponseBase(message="未指定会话")
+    db.query(ChatMessage).filter(ChatMessage.session_id.in_(session_ids)).delete(synchronize_session=False)
+    count = db.query(ChatSession).filter(ChatSession.session_id.in_(session_ids)).delete(synchronize_session=False)
+    db.commit()
+    return ResponseBase(message=f"已删除 {count} 个会话")
 
 
 @router.get("/sessions")

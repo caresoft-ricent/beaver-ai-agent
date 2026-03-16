@@ -1,4 +1,6 @@
 """Beaver AI Agent - FastAPI 应用入口"""
+import os
+import time
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -6,6 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import engine, Base
+
+# 设置时区为北京时间, 确保日志和 datetime.now() 使用 UTC+8
+os.environ.setdefault("TZ", "Asia/Shanghai")
+time.tzset()
 
 # 配置全链路日志: beaver.* 命名空间
 logging.basicConfig(

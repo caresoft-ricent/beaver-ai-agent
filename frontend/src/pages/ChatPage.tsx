@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Layout, Input, Button, List, Typography, Space, Spin, Tag, Empty,
-  theme, Popconfirm, message, Tooltip, Drawer,
+  theme, Popconfirm, message, Tooltip, Drawer, Checkbox,
 } from 'antd';
 import {
   SendOutlined, PlusOutlined, MessageOutlined, UserOutlined,
@@ -11,7 +11,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import client from '../api/client';
-import { deleteSession } from '../api/admin';
+import { deleteSession, batchDeleteSessions } from '../api/admin';
 
 const { Sider, Content } = Layout;
 const { Text } = Typography;
@@ -108,6 +108,8 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
   const [listening, setListening] = useState(false);
   const [currentStep, setCurrentStep] = useState<string | null>(null);
   const [siderOpen, setSiderOpen] = useState(false);
+  const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
+  const [batchMode, setBatchMode] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<any>(null);
@@ -199,6 +201,28 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
       if (activeSession === sessionId) handleNewChat();
       loadSessions();
     } catch { message.error('\u5220\u9664\u5931\u8d25'); }
+  };
+
+  const toggleSessionSelect = (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedSessions(prev => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) next.delete(sessionId);
+      else next.add(sessionId);
+      return next;
+    });
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedSessions.size === 0) return;
+    try {
+      await batchDeleteSessions([...selectedSessions]);
+      message.success(`已删除 ${selectedSessions.size} 个会话`);
+      if (activeSession && selectedSessions.has(activeSession)) handleNewChat();
+      setSelectedSessions(new Set());
+      setBatchMode(false);
+      loadSessions();
+    } catch { message.error('批量删除失败'); }
   };
 
   const processEvent = (evt: AGUIEvent, assistantId: string) => {
@@ -372,10 +396,33 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
   /* ── Session list content (shared between desktop sider and mobile drawer) ── */
   const sessionList = (
     <>
-      <div style={{ padding: 12 }}>
+      <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <Button type="primary" icon={<PlusOutlined />} block onClick={handleNewChat}>
           {'\u65b0\u5efa\u5bf9\u8bdd'}
         </Button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Button
+            size="small"
+            block
+            onClick={() => { setBatchMode(!batchMode); setSelectedSessions(new Set()); }}
+          >
+            {batchMode ? '\u53d6\u6d88' : '\u6279\u91cf\u7ba1\u7406'}
+          </Button>
+          {batchMode && (
+            <Popconfirm
+              title={`\u786e\u5b9a\u5220\u9664\u9009\u4e2d\u7684 ${selectedSessions.size} \u4e2a\u4f1a\u8bdd\uff1f`}
+              description={'\u5220\u9664\u540e\u4e0d\u53ef\u6062\u590d'}
+              onConfirm={handleBatchDelete}
+              okText={'\u5220\u9664'}
+              cancelText={'\u53d6\u6d88'}
+              disabled={selectedSessions.size === 0}
+            >
+              <Button size="small" danger disabled={selectedSessions.size === 0}>
+                \u5220\u9664({selectedSessions.size})
+              </Button>
+            </Popconfirm>
+          )}
+        </div>
       </div>
       <div style={{ flex: 1, overflow: 'auto', padding: '0 4px' }}>
         {loadingSessions ? (
@@ -396,8 +443,14 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
                 <Space direction="vertical" size={0} style={{ width: '100%' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Space>
+                      {batchMode && (
+                        <Checkbox
+                          checked={selectedSessions.has(s.session_id)}
+                          onClick={(e) => toggleSessionSelect(s.session_id, e as unknown as React.MouseEvent)}
+                        />
+                      )}
                       <MessageOutlined />
-                      <Text ellipsis style={{ maxWidth: 140 }}>{s.customer_name || s.customer_id}</Text>
+                      <Text ellipsis style={{ maxWidth: batchMode ? 110 : 140 }}>{s.customer_name || s.customer_id}</Text>
                     </Space>
                     <Popconfirm
                       title={'\u786e\u5b9a\u5220\u9664\u8be5\u4f1a\u8bdd\uff1f'}
