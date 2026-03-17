@@ -478,7 +478,11 @@ def _enhanced_entity_extraction(
     skill: Skill, known_entities: dict, ctx: dict,
 ) -> dict:
     """LLM 增强实体抽取，返回 {entities, _llm_prompt, _llm_response}"""
-    llm_config = _get_llm_config(db, tenant_id, "entity") or _get_llm_config(db, tenant_id, "general")
+    llm_config = (
+        _get_llm_config(db, tenant_id, "entity")
+        or _get_llm_config(db, tenant_id, "intent")
+        or _get_llm_config(db, tenant_id, "response")
+    )
     if not llm_config:
         return {}
 
