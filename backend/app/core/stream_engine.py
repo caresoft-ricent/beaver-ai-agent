@@ -58,7 +58,7 @@ async def stream_dialog(
     try:
         async for evt in _stream_dialog_inner(
             db, tenant_id, customer_id, session_id, message,
-            thread_id, run_id, evidence,
+            thread_id, run_id, evidence, scope,
         ):
             yield evt
     except Exception as exc:
@@ -90,6 +90,7 @@ async def _stream_dialog_inner(
     thread_id: str,
     run_id: str,
     evidence: EvidenceCollector,
+    scope: BeaverSessionScope = None,
 ) -> AsyncGenerator[str, None]:
 
     # -- Step 1: 加载上下文 --
