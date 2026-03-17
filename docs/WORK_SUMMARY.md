@@ -374,7 +374,7 @@ uvicorn app.main:app --reload --port 8000
 python3 scripts/seed_demo.py
 
 # 5. 启动前端
-cd ../frontend
+cd frontend
 npm install
 npm run dev
 # 访问 http://localhost:3000

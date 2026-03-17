@@ -501,7 +501,7 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
 
   return (
     <Layout style={{
-      height: (isMobile || embedMode) ? '100vh' : 'calc(100vh - 96px)',
+      height: (isMobile || embedMode) ? '100dvh' : 'calc(100vh - 96px)',
       margin: (isMobile || embedMode) ? 0 : '-24px',
       background: 'transparent', overflow: 'hidden',
     }}>
@@ -887,6 +887,7 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
         /* ===== 输入区域 ===== */
         .chat-input-area {
           padding: 16px 20px;
+          padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
           background: white;
           border-top: 1px solid #E5E7EB;
         }

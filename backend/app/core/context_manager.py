@@ -13,6 +13,8 @@ from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
 
+logger = logging.getLogger("beaver.context")
+
 from app.models.chat import ChatSession
 from app.models.intent import Skill, SkillTool
 from app.models.ontology import EntityProperty
@@ -32,11 +34,15 @@ def load_context(db: Session, session_id: str) -> dict:
 
 
 def save_context(db: Session, session_id: str, ctx: dict):
-    """将上下文快照写回 DB"""
-    session = db.query(ChatSession).filter(ChatSession.session_id == session_id).first()
-    if session:
-        session.context_snapshot = ctx
-        db.flush()
+    """将上下文快照写回 DB — 立即提交以释放行锁，避免 SSE 流式期间长事务"""
+    try:
+        session = db.query(ChatSession).filter(ChatSession.session_id == session_id).first()
+        if session:
+            session.context_snapshot = ctx
+            db.commit()
+    except Exception as exc:
+        logger.warning("save_context failed for session %s: %s", session_id, exc)
+        db.rollback()
 
 
 def merge_entities(old: dict, new: dict) -> dict:

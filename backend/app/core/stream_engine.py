@@ -74,9 +74,9 @@ async def stream_dialog(
             result=evidence.to_dict(),
             error_message=evidence.errors[0]["error"] if evidence.errors else None,
         )
-        db.flush()
+        db.commit()
     except Exception:
-        pass
+        db.rollback()
 
     yield agui.run_finished(thread_id, run_id)
 
