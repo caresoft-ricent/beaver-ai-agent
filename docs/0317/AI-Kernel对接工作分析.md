@@ -383,3 +383,5 @@ AI_TICKET_SECRET=生成的密钥
 - T1 ~ T6 完全不依赖河狸云接口，可以立即开始开发
 - 使用 Mock ticket 进行本地测试
 - scope_proxy 可在现有连接器上配置测试
+
+测试
