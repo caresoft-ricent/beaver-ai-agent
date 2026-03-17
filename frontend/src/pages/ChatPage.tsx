@@ -629,7 +629,7 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
                               value={editingText}
                               onChange={(e) => setEditingText(e.target.value)}
                               autoSize={{ minRows: 1, maxRows: 6 }}
-                              style={{ borderRadius: 8, fontSize: 14 }}
+                              style={{ borderRadius: 8, fontSize: 16 }}
                               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const t = editingText.trim(); if (t) doSend(t); } }}
                               autoFocus
                             />
@@ -838,7 +838,7 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
                   placeholder={'给 河狸云AI 发消息…'}
                   autoSize={{ minRows: 1, maxRows: 6 }}
                   variant="borderless"
-                  style={{ flex: 1, resize: 'none', fontSize: 14 }}
+                  style={{ flex: 1, resize: 'none', fontSize: 16 }}
                   disabled={sending}
                 />
                 {!hasInput && (
