@@ -11,6 +11,7 @@ import EntityList from './pages/EntityList';
 import SkillList from './pages/SkillList';
 import ChatPage from './pages/ChatPage';
 import ChatEmbed from './pages/ChatEmbed';
+import ChatApp from './pages/ChatApp';
 import LogsPage from './pages/LogsPage';
 import NormalizationPage from './pages/NormalizationPage';
 import WorkflowPage from './pages/WorkflowPage';
@@ -28,6 +29,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/chat-embed" element={<ChatEmbed />} />
+          <Route path="/chat/app" element={<ChatApp />} />
           <Route path="/intents/:id/workflow" element={<ProtectedRoute><WorkflowPage /></ProtectedRoute>} />
           <Route path="/" element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
             <Route index element={<Dashboard />} />

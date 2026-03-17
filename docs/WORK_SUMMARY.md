@@ -2,7 +2,7 @@
 
 > 项目代号：beaver-ai-agent
 > 仓库地址：`git@gitlab.ricent.com:ricent/beaver-ai-agent.git`（main 分支）
-> 最后更新：2026-03-16
+> 最后更新：2026-03-17
 
 ---
 
@@ -73,7 +73,7 @@
 
 ## 三、功能模块详解
 
-### 3.1 管理后台（12 个页面）
+### 3.1 管理后台（13 个页面）
 
 | 页面 | 路由 | 功能说明 |
 |------|------|---------|
@@ -87,6 +87,7 @@
 | 流程编排 | `/intents/:id/workflow` | 全屏可视化有向图编辑器，拖拽节点、连线编排、JSON 导出/导入 |
 | 对话测试 | `/chat` | 完整聊天界面，会话管理，意图标签展示，快捷引导 |
 | 独立聊天 | `/chat-embed` | iframe 可嵌入的独立对话界面，支持租户/客户参数 |
+| H5移动端 | `/chat/app` | 独立H5对话页面，适配移动端浏览器，支持复制/编辑/停止生成 |
 | 日志查询 | `/logs` | 动作日志、消息日志、错误日志三类查询 |
 | 归一化规则 | `/normalization` | 日期短语 / 状态映射 / 参数转换规则维护 |
 
@@ -328,8 +329,9 @@ beaver-ai-agent/
     │   │   ├── EntityList.tsx      # 业务本体管理
     │   │   ├── SkillList.tsx       # 技能/意图管理
     │   │   ├── WorkflowPage.tsx    # 流程编排页面（全屏）
-    │   │   ├── ChatPage.tsx        # 对话测试
+    │   │   ├── ChatPage.tsx        # 对话测试（含复制/编辑/停止生成）
     │   │   ├── ChatEmbed.tsx       # 独立聊天（iframe）
+    │   │   ├── ChatApp.tsx         # H5移动端独立聊天
     │   │   ├── LogsPage.tsx        # 日志查询
     │   │   └── NormalizationPage.tsx  # 归一化规则
     │   ├── components/

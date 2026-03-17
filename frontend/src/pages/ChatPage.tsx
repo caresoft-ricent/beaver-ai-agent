@@ -7,6 +7,7 @@ import {
   SendOutlined, PlusOutlined, MessageOutlined, UserOutlined,
   RobotOutlined, DeleteOutlined, AudioOutlined, AudioMutedOutlined,
   LoadingOutlined, ToolOutlined, MenuOutlined,
+  CopyOutlined, EditOutlined,
 } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -110,6 +111,8 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
   const [siderOpen, setSiderOpen] = useState(false);
   const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
   const [batchMode, setBatchMode] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<any>(null);
@@ -192,6 +195,13 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
     setSiderOpen(false);
     inputRef.current?.focus();
   };
+
+  const handleStop = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+  }, []);
 
   const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -291,6 +301,16 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
       setListening(false);
     }
 
+    // Edit mode: remove edited message and all subsequent, then re-send
+    if (editingMessageId) {
+      setMessages(prev => {
+        const idx = prev.findIndex(m => m.id === editingMessageId);
+        return idx >= 0 ? prev.slice(0, idx) : prev;
+      });
+      setEditingMessageId(null);
+      setEditingText('');
+    }
+
     const userMsg: ChatMessage = { id: `u_${Date.now()}`, role: 'user', content: text };
     setMessages(prev => [...prev, userMsg]);
     setInputValue('');
@@ -366,7 +386,7 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
     setSending(false);
     setCurrentStep(null);
     loadSessions();
-    inputRef.current?.focus();
+    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
   const handleSend = async () => {
@@ -589,7 +609,7 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
                       <span style={{ opacity: 0.8 }}>{msg.content}</span>
                     </div>
                   ) : (
-                    <div style={{
+                    <div className="msg-row" style={{
                       display: 'flex', gap: isMobile ? 8 : 12,
                       flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
                       alignItems: 'flex-start',
@@ -603,25 +623,54 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
                         {msg.role === 'user' ? <UserOutlined /> : <RobotOutlined />}
                       </div>
                       <div style={{ maxWidth: isMobile ? '82%' : '75%', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <div style={{
-                          background: msg.role === 'user' ? 'linear-gradient(135deg, #F5811F, #E06D0C)' : '#fff',
-                          color: msg.role === 'user' ? '#fff' : t.colorText,
-                          padding: isMobile ? '10px 14px' : '12px 16px',
-                          borderRadius: 16,
-                          borderBottomRightRadius: msg.role === 'user' ? 4 : 16,
-                          borderBottomLeftRadius: msg.role === 'user' ? 16 : 4,
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                          lineHeight: 1.7, fontSize: isMobile ? 14 : 14,
-                        }}>
-                          {msg.role === 'user' ? (
-                            <span>{msg.content}</span>
-                          ) : (
-                            <div className="md-body">
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                              {msg.streaming && <span className="cursor-blink">{'\u258d'}</span>}
+                        {msg.role === 'user' && editingMessageId === msg.id ? (
+                          <div className="msg-edit-area">
+                            <Input.TextArea
+                              value={editingText}
+                              onChange={(e) => setEditingText(e.target.value)}
+                              autoSize={{ minRows: 1, maxRows: 6 }}
+                              style={{ borderRadius: 8, fontSize: 14 }}
+                              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); const t = editingText.trim(); if (t) doSend(t); } }}
+                              autoFocus
+                            />
+                            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+                              <Button size="small" onClick={() => { setEditingMessageId(null); setEditingText(''); }}>取消</Button>
+                              <Button size="small" type="primary" onClick={() => { const t = editingText.trim(); if (t) doSend(t); }}>发送</Button>
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        ) : (
+                          <div style={{
+                            background: msg.role === 'user' ? 'linear-gradient(135deg, #F5811F, #E06D0C)' : '#fff',
+                            color: msg.role === 'user' ? '#fff' : t.colorText,
+                            padding: isMobile ? '10px 14px' : '12px 16px',
+                            borderRadius: 16,
+                            borderBottomRightRadius: msg.role === 'user' ? 4 : 16,
+                            borderBottomLeftRadius: msg.role === 'user' ? 16 : 4,
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                            lineHeight: 1.7, fontSize: isMobile ? 14 : 14,
+                          }}>
+                            {msg.role === 'user' ? (
+                              <span>{msg.content}</span>
+                            ) : (
+                              <div className="md-body">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                                {msg.streaming && <span className="cursor-blink">{'\u258d'}</span>}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {!msg.streaming && !editingMessageId && (
+                          <div className="msg-actions" style={{ justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                            <Tooltip title="复制">
+                              <CopyOutlined className="msg-action-icon" onClick={() => { navigator.clipboard.writeText(msg.content); message.success('已复制'); }} />
+                            </Tooltip>
+                            {msg.role === 'user' && !sending && (
+                              <Tooltip title="编辑">
+                                <EditOutlined className="msg-action-icon" onClick={() => { setEditingMessageId(msg.id); setEditingText(msg.content); }} />
+                              </Tooltip>
+                            )}
+                          </div>
+                        )}
                         {/* 卡片渲染 */}
                         {msg.cards?.map((card, ci) => (
                           <div key={ci} style={{ marginTop: 8 }}>
@@ -758,13 +807,19 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
               ))
             )}
 
-            {sending && currentStep && (
+            {sending && (
               <div style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '8px 0', color: t.colorTextSecondary, fontSize: 13,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+                padding: '8px 0',
               }}>
-                <LoadingOutlined />
-                <span>{stepLabel[currentStep] || currentStep}...</span>
+                {currentStep && (
+                  <span style={{ fontSize: 12, color: t.colorTextSecondary, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <LoadingOutlined /> {stepLabel[currentStep] || currentStep}...
+                  </span>
+                )}
+                <Button size="small" onClick={handleStop} style={{ borderRadius: 16, fontSize: 12 }}>
+                  ■ 停止生成
+                </Button>
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -799,13 +854,15 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
                   </Tooltip>
                 )}
               </div>
-              <button
-                className="chat-send-btn"
-                onClick={handleSend}
-                disabled={!hasInput || sending}
-              >
-                {sending ? <LoadingOutlined style={{ fontSize: 18, color: '#fff' }} /> : <SendOutlined style={{ fontSize: 18, color: '#fff' }} />}
-              </button>
+              {sending ? (
+                <button className="chat-send-btn chat-stop-btn" onClick={handleStop} title="停止生成">
+                  <div className="stop-square" />
+                </button>
+              ) : (
+                <button className="chat-send-btn" onClick={handleSend} disabled={!hasInput}>
+                  <SendOutlined style={{ fontSize: 18, color: '#fff' }} />
+                </button>
+              )}
             </div>
             <div className="chat-shortcuts">
               {[
@@ -920,6 +977,33 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
         .md-body blockquote { border-left: 3px solid #8B5CF6; margin: 8px 0; padding: 4px 12px; color: #666; background: #F9FAFB; border-radius: 0 6px 6px 0; }
         .md-body hr { border: none; border-top: 1px solid #E5E7EB; margin: 12px 0; }
         .md-body a { color: #3B82F6; text-decoration: none; }
+        /* ===== Message actions (copy/edit) ===== */
+        .msg-actions {
+          display: flex; gap: 12px; padding: 4px 4px 0; opacity: 0;
+          transition: opacity 0.15s;
+        }
+        .msg-row:hover .msg-actions { opacity: 1; }
+        .msg-action-icon {
+          font-size: 13px; color: #999; cursor: pointer;
+          transition: color 0.15s;
+        }
+        .msg-action-icon:hover { color: #8B5CF6; }
+        /* ===== Inline edit area ===== */
+        .msg-edit-area {
+          background: #fff; border: 1px solid #d9d9d9; border-radius: 12px;
+          padding: 12px; min-width: 200px;
+        }
+        /* ===== Stop button ===== */
+        .chat-stop-btn { background: #ff4d4f !important; }
+        .chat-stop-btn:hover { background: #ff7875 !important; transform: scale(1.05); }
+        .stop-square {
+          width: 14px; height: 14px; background: #fff;
+          border-radius: 2px;
+        }
+        /* Mobile: always show message actions (no hover) */
+        @media (max-width: 767px) {
+          .msg-actions { opacity: 1; }
+        }
       `}</style>
     </Layout>
   );
