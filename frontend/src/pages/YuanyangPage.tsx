@@ -228,91 +228,109 @@ interface PanoViewerProps {
 
 function PanoViewer({ panoUrl, onLoadStart, onLoadEnd }: PanoViewerProps) {
   const mountRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const sphereRef = useRef<THREE.Mesh | null>(null);
-  const rafRef = useRef<number>(0);
-  const isDragging = useRef(false);
-  const prevMouse = useRef({ x: 0, y: 0 });
-  const velocity = useRef({ x: 0, y: 0 });
-  const rotation = useRef({ lon: 0, lat: 0 });
-  const targetFov = useRef(75);
-  const initDone = useRef(false);
-  const loaderRef = useRef<THREE.TextureLoader | null>(null);
+  const threeRef = useRef<{
+    renderer: THREE.WebGLRenderer;
+    scene: THREE.Scene;
+    camera: THREE.PerspectiveCamera;
+    sphere: THREE.Mesh;
+    loader: THREE.TextureLoader;
+    geometry: THREE.SphereGeometry;
+    material: THREE.MeshBasicMaterial;
+  } | null>(null);
+  const rafRef = useRef(0);
+  const drag = useRef({ active: false, px: 0, py: 0, vx: 0, vy: 0, lon: 0, lat: 0, fov: 75 });
 
-  const initScene = useCallback(() => {
-    if (!mountRef.current || initDone.current) return;
-    initDone.current = true;
+  // Scene init (runs once, no texture loading here)
+  useEffect(() => {
     const container = mountRef.current;
-    const w = container.clientWidth;
-    const h = container.clientHeight;
+    if (!container) return;
+
+    const w = container.clientWidth || window.innerWidth;
+    const h = container.clientHeight || window.innerHeight;
 
     const scene = new THREE.Scene();
-    sceneRef.current = scene;
-
     const camera = new THREE.PerspectiveCamera(75, w / h, 0.1, 1100);
     camera.position.set(0, 0, 0);
-    cameraRef.current = camera;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(w, h);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
 
-    // Create sphere for equirectangular projection
     const geometry = new THREE.SphereGeometry(500, 64, 32);
-    geometry.scale(-1, 1, 1); // Render inside
-
-    const material = new THREE.MeshBasicMaterial({ color: 0x111111 });
+    geometry.scale(-1, 1, 1);
+    const material = new THREE.MeshBasicMaterial({ color: 0x222222 });
     const sphere = new THREE.Mesh(geometry, material);
     scene.add(sphere);
-    sphereRef.current = sphere;
 
-    loaderRef.current = new THREE.TextureLoader();
+    const loader = new THREE.TextureLoader();
+    threeRef.current = { renderer, scene, camera, sphere, loader, geometry, material };
 
-    // Load initial panorama
-    loadPanorama(panoUrl);
-
-    // Animation loop
+    const d = drag.current;
     const animate = () => {
       rafRef.current = requestAnimationFrame(animate);
-      if (!isDragging.current) {
-        velocity.current.x *= 0.95;
-        velocity.current.y *= 0.95;
-        rotation.current.lon += velocity.current.x;
-        rotation.current.lat += velocity.current.y;
+
+      if (!d.active) {
+        d.vx *= 0.95;
+        d.vy *= 0.95;
+        d.lon += d.vx;
+        d.lat += d.vy;
       }
-      // Auto-rotate when idle
-      if (!isDragging.current && Math.abs(velocity.current.x) < 0.01 && Math.abs(velocity.current.y) < 0.01) {
-        rotation.current.lon += 0.015;
+      if (!d.active && Math.abs(d.vx) < 0.01 && Math.abs(d.vy) < 0.01) {
+        d.lon += 0.015;
       }
-      rotation.current.lat = Math.max(-85, Math.min(85, rotation.current.lat));
-      camera.fov += (targetFov.current - camera.fov) * 0.1;
+      d.lat = Math.max(-85, Math.min(85, d.lat));
+
+      camera.fov += (d.fov - camera.fov) * 0.1;
       camera.updateProjectionMatrix();
 
-      const phi = THREE.MathUtils.degToRad(90 - rotation.current.lat);
-      const theta = THREE.MathUtils.degToRad(rotation.current.lon);
-      const target = new THREE.Vector3(
+      const phi = THREE.MathUtils.degToRad(90 - d.lat);
+      const theta = THREE.MathUtils.degToRad(d.lon);
+      camera.lookAt(new THREE.Vector3(
         500 * Math.sin(phi) * Math.cos(theta),
         500 * Math.cos(phi),
-        500 * Math.sin(phi) * Math.sin(theta)
-      );
-      camera.lookAt(target);
+        500 * Math.sin(phi) * Math.sin(theta),
+      ));
       renderer.render(scene, camera);
     };
     animate();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadPanorama = useCallback((url: string) => {
-    if (!loaderRef.current || !sphereRef.current) return;
+    // Resize handler
+    const onResize = () => {
+      if (!container) return;
+      const cw = container.clientWidth, ch = container.clientHeight;
+      camera.aspect = cw / ch;
+      camera.updateProjectionMatrix();
+      renderer.setSize(cw, ch);
+    };
+    window.addEventListener('resize', onResize);
+
+    return () => {
+      window.removeEventListener('resize', onResize);
+      cancelAnimationFrame(rafRef.current);
+      container.removeChild(renderer.domElement);
+      renderer.dispose();
+      geometry.dispose();
+      material.dispose();
+      threeRef.current = null;
+    };
+  }, []);
+
+  // Load / switch panorama texture
+  useEffect(() => {
+    const three = threeRef.current;
+    if (!three) return;
+
     onLoadStart?.();
-    loaderRef.current.load(
-      url,
+    three.loader.load(
+      panoUrl,
       (texture) => {
+        if (!threeRef.current) return; // unmounted
         texture.colorSpace = THREE.SRGBColorSpace;
-        const mat = sphereRef.current!.material as THREE.MeshBasicMaterial;
+        texture.minFilter = THREE.LinearFilter;
+        texture.generateMipmaps = false;
+        const mat = threeRef.current.material;
         if (mat.map) mat.map.dispose();
         mat.map = texture;
         mat.color.set(0xffffff);
@@ -320,73 +338,39 @@ function PanoViewer({ panoUrl, onLoadStart, onLoadEnd }: PanoViewerProps) {
         onLoadEnd?.();
       },
       undefined,
-      () => {
+      (err) => {
+        console.error('[PanoViewer] texture load failed:', panoUrl, err);
         onLoadEnd?.();
-      }
+      },
     );
-  }, [onLoadStart, onLoadEnd]);
-
-  // Switch panorama when panoUrl changes
-  useEffect(() => {
-    if (initDone.current && loaderRef.current && sphereRef.current) {
-      loadPanorama(panoUrl);
-    }
-  }, [panoUrl, loadPanorama]);
-
-  // Init
-  useEffect(() => {
-    initScene();
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      if (rendererRef.current && mountRef.current) {
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        mountRef.current.removeChild(rendererRef.current.domElement);
-        rendererRef.current.dispose();
-      }
-      initDone.current = false;
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Resize
-  useEffect(() => {
-    const onResize = () => {
-      if (!mountRef.current || !cameraRef.current || !rendererRef.current) return;
-      const w = mountRef.current.clientWidth, h = mountRef.current.clientHeight;
-      cameraRef.current.aspect = w / h;
-      cameraRef.current.updateProjectionMatrix();
-      rendererRef.current.setSize(w, h);
-    };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panoUrl]);
 
   // Pointer events
   const onPointerDown = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    isDragging.current = true;
-    velocity.current = { x: 0, y: 0 };
+    const d = drag.current;
+    d.active = true; d.vx = 0; d.vy = 0;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    prevMouse.current = { x: clientX, y: clientY };
+    d.px = clientX; d.py = clientY;
   }, []);
 
   const onPointerMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDragging.current) return;
+    const d = drag.current;
+    if (!d.active) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const dx = (clientX - prevMouse.current.x) * 0.15;
-    const dy = (clientY - prevMouse.current.y) * 0.15;
-    rotation.current.lon -= dx;
-    rotation.current.lat += dy;
-    velocity.current = { x: -dx, y: dy };
-    prevMouse.current = { x: clientX, y: clientY };
+    const dx = (clientX - d.px) * 0.15;
+    const dy = (clientY - d.py) * 0.15;
+    d.lon -= dx; d.lat += dy;
+    d.vx = -dx; d.vy = dy;
+    d.px = clientX; d.py = clientY;
   }, []);
 
-  const onPointerUp = useCallback(() => {
-    isDragging.current = false;
-  }, []);
+  const onPointerUp = useCallback(() => { drag.current.active = false; }, []);
 
   const onWheel = useCallback((e: React.WheelEvent) => {
-    targetFov.current = Math.max(30, Math.min(100, targetFov.current + e.deltaY * 0.05));
+    drag.current.fov = Math.max(30, Math.min(100, drag.current.fov + e.deltaY * 0.05));
   }, []);
 
   return (
