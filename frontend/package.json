@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
+    "@types/three": "^0.183.1",
     "@xyflow/react": "^12.10.1",
     "antd": "^6.3.2",
     "axios": "^1.13.6",
@@ -18,7 +19,8 @@
     "react-dom": "^19.2.4",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.13.1",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "three": "^0.183.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
