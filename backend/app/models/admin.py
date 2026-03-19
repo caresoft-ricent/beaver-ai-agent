@@ -7,7 +7,7 @@ from app.database import Base
 
 class AdminUser(Base):
     """管理员用户"""
-    __tablename__ = "ai_admin_user"
+    __tablename__ = "rc_ai_admin_user"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     username = Column(String(64), nullable=False, unique=True, comment="用户名")
@@ -22,7 +22,7 @@ class AdminUser(Base):
 
 class OperationLog(Base):
     """操作审计日志"""
-    __tablename__ = "ai_operation_log"
+    __tablename__ = "rc_ai_operation_log"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     admin_user_id = Column(BigInteger, nullable=False, index=True)

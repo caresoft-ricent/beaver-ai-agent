@@ -7,7 +7,7 @@ from app.database import Base
 
 class Tenant(Base):
     """租户 - SaaS多租户隔离"""
-    __tablename__ = "ai_tenant"
+    __tablename__ = "rc_ai_tenant"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     name = Column(String(128), nullable=False, comment="租户名称")
@@ -21,7 +21,7 @@ class Tenant(Base):
 
 class TenantApiKey(Base):
     """租户API密钥 - 租户访问本系统的凭据"""
-    __tablename__ = "ai_tenant_api_key"
+    __tablename__ = "rc_ai_tenant_api_key"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     tenant_id = Column(BigInteger, nullable=False, index=True, comment="租户ID")

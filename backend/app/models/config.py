@@ -7,7 +7,7 @@ from app.database import Base
 
 class LLMConfig(Base):
     """大模型配置 - 第一阶段核心：豆包/GLM/千问/自有"""
-    __tablename__ = "ai_llm_config"
+    __tablename__ = "rc_ai_llm_config"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     tenant_id = Column(BigInteger, nullable=False, index=True, comment="租户ID")
@@ -27,12 +27,12 @@ class LLMConfig(Base):
 
 
 class Connector(Base):
-    """连接器 - 外部系统接入抽象(河狸云/其他API)"""
-    __tablename__ = "ai_connector"
+    """适配器 - 外部系统接入抽象(河狸云/其他API) (表名: rc_ai_adapter)"""
+    __tablename__ = "rc_ai_adapter"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     tenant_id = Column(BigInteger, nullable=False, index=True, comment="租户ID")
-    name = Column(String(128), nullable=False, comment="连接器名称")
+    name = Column(String(128), nullable=False, comment="适配器名称")
     type = Column(String(32), nullable=False, default="beaver_cloud",
                   comment="类型: beaver_cloud/custom_api")
     base_url = Column(String(512), nullable=False, comment="基础URL")
@@ -43,5 +43,9 @@ class Connector(Base):
     health_check_path = Column(String(256), comment="健康检查路径")
     mock_enabled = Column(String(1), default="0", comment="是否启用mock降级: 0/1")
     status = Column(String(16), nullable=False, default="active", comment="active/disabled")
+    # v6 新增字段
+    adapter_type = Column(String(16), default="webapi", comment="适配器类型: webapi/database")
+    db_config = Column(JSON, comment="数据库配置（WebAPI类不需要）")
+    openapi_url = Column(String(500), comment="OpenAPI文档地址（远期）")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

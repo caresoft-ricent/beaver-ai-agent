@@ -29,9 +29,11 @@ from app.models import (  # noqa: F401
     BaseProperty, Entity, EntityProperty, EntityRelation,
     Action, ActionParameter, Skill, SkillTool,
     ChatSession, ChatMessage, ActionLog, AdminUser, OperationLog,
+    ExecutionLog,
 )
 from app.api.admin import router as admin_router
 from app.api.v1 import router as v1_router
+from app.api.session_routes import router as session_router
 
 settings = get_settings()
 
@@ -62,6 +64,7 @@ app.add_middleware(
 
 app.include_router(admin_router, prefix="/api/admin")
 app.include_router(v1_router, prefix="/api/v1")
+app.include_router(session_router)
 
 
 @app.get("/health")

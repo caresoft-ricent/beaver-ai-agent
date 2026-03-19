@@ -12,7 +12,7 @@ from app.database import Base
 
 class Skill(Base):
     """技能 - 对应一种用户意图 (殷明: rc_ai_skill)"""
-    __tablename__ = "ai_skill"
+    __tablename__ = "rc_ai_skill"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     tenant_id = Column(BigInteger, nullable=False, index=True, comment="租户ID")
@@ -44,13 +44,17 @@ class Skill(Base):
     status = Column(String(16), nullable=False, default="draft", comment="draft/published")
     version = Column(Integer, default=1, comment="配置版本号")
     sort_order = Column(Integer, default=0, comment="排序(匹配优先级)")
+    # v6 新增字段
+    generated_by = Column(String(16), default="manual", comment="数据来源: manual/llm/domain_auto")
+    discovery_status = Column(String(16), default="published", comment="审核状态: draft/reviewed/published")
+    test_cases = Column(JSON, comment="测试用例")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class SkillTool(Base):
-    """技能工具 - 技能与本体/工具的有序关联 (殷明: rc_ai_skills_tools)"""
-    __tablename__ = "ai_skill_tool"
+    """技能工具 - 技能与本体/工具的有序关联 (殷明: rc_ai_tool)"""
+    __tablename__ = "rc_ai_tool"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     skill_id = Column(BigInteger, nullable=False, index=True, comment="所属技能ID")
@@ -60,4 +64,6 @@ class SkillTool(Base):
     action_id = Column(BigInteger, comment="关联操作ID(指定本体下的具体操作)")
     order_no = Column(Integer, nullable=False, default=0, comment="执行顺序")
     config = Column(JSON, comment="工具配置(JSON): 参数映射、条件等")
+    # v6 新增字段
+    generated_by = Column(String(16), default="manual", comment="数据来源: manual/llm")
     created_at = Column(DateTime, server_default=func.now())

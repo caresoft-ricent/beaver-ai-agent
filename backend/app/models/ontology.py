@@ -7,14 +7,14 @@ rc_ai_entity_relation → EntityRelation (本体关系)
 rc_ai_base_property   → BaseProperty (基础属性模板)
 """
 from sqlalchemy import (
-    Column, BigInteger, String, Text, DateTime, Boolean, Integer, JSON, func
+    Column, BigInteger, String, Text, DateTime, Boolean, Integer, JSON, Numeric, func
 )
 from app.database import Base
 
 
 class BaseProperty(Base):
     """基础属性模板 - 跨本体复用的属性定义 (殷明: rc_ai_base_property)"""
-    __tablename__ = "ai_base_property"
+    __tablename__ = "rc_ai_base_property"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     tenant_id = Column(BigInteger, nullable=False, index=True, comment="租户ID")
@@ -30,7 +30,7 @@ class BaseProperty(Base):
 
 class Entity(Base):
     """业务本体 - 业务实体抽象 (殷明: rc_ai_entity)"""
-    __tablename__ = "ai_entity"
+    __tablename__ = "rc_ai_entity"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     tenant_id = Column(BigInteger, nullable=False, index=True, comment="租户ID")
@@ -43,13 +43,17 @@ class Entity(Base):
     connector_id = Column(BigInteger, comment="关联连接器ID")
     status = Column(String(16), nullable=False, default="draft", comment="draft/published")
     version = Column(Integer, default=1, comment="配置版本号")
+    # v6 新增字段
+    generated_by = Column(String(16), default="manual", comment="数据来源: manual/llm/api_sync/domain_auto")
+    confidence = Column(Numeric(3, 2), default=1.00, comment="可信度")
+    discovery_status = Column(String(16), default="published", comment="审核状态: draft/reviewed/published")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class EntityProperty(Base):
     """本体属性 - 本体的字段定义 (殷明: rc_ai_entity_property)"""
-    __tablename__ = "ai_entity_property"
+    __tablename__ = "rc_ai_entity_property"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     entity_id = Column(BigInteger, nullable=False, index=True, comment="所属本体ID")
@@ -67,19 +71,26 @@ class EntityProperty(Base):
     extract_expression = Column(Text, comment="参数兜底提取规则(正则或表达式)")
     normalization_config = Column(JSON, comment="归一化配置: 同义词/日期/枚举转换规则(JSON)")
     mapping_config = Column(JSON, comment="参数映射配置: 转换规则如名称→ID(JSON)")
+    # v6 新增字段
+    semantic_role = Column(String(16), comment="语义角色: identifier/status/scope/timestamp/metric/label/content")
+    enum_values = Column(JSON, comment="枚举值")
+    generated_by = Column(String(16), default="manual", comment="数据来源: manual/llm")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class EntityRelation(Base):
     """本体关系 - 本体之间的关联 (殷明: rc_ai_entity_relation)"""
-    __tablename__ = "ai_entity_relation"
+    __tablename__ = "rc_ai_entity_relation"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     entity_id = Column(BigInteger, nullable=False, index=True, comment="源本体ID")
     ref_entity_id = Column(BigInteger, nullable=False, index=True, comment="目标本体ID")
     property_id = Column(BigInteger, comment="源属性ID(关联字段)")
     ref_property_id = Column(BigInteger, comment="目标属性ID(关联字段)")
-    relation_type = Column(String(16), default="1:N", comment="关系类型: 1:1/1:N/N:M")
+    relation_type = Column(String(16), default="1:N", comment="关系类型: belongs_to/has_many/references")
     description = Column(Text, comment="关系描述")
+    # v6 新增字段
+    join_property = Column(String(200), comment="关联字段")
+    generated_by = Column(String(16), default="manual", comment="数据来源: manual/llm")
     created_at = Column(DateTime, server_default=func.now())

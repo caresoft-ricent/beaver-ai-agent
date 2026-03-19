@@ -12,7 +12,7 @@ from app.database import Base
 
 class Action(Base):
     """操作 - API调用定义，必须关联本体 (殷明: rc_ai_action)"""
-    __tablename__ = "ai_action"
+    __tablename__ = "rc_ai_action"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     tenant_id = Column(BigInteger, nullable=False, index=True, comment="租户ID")
@@ -38,13 +38,18 @@ class Action(Base):
     policy_config = Column(JSON, nullable=True, comment="安全策略配置(JSON): scope_check, preconditions, rate_limit等")
     cache_ttl = Column(Integer, default=0, comment="缓存时间(秒), 0=不缓存")
     mock_response = Column(JSON, comment="Mock响应数据(JSON)")
+    # v6 新增字段
+    action_type = Column(String(16), default="query", comment="查询/写操作: query/mutation")
+    risk_level = Column(String(16), default="low", comment="风险等级: low/medium/high")
+    generated_by = Column(String(16), default="manual", comment="数据来源: manual/llm/api_sync")
+    discovery_status = Column(String(16), default="published", comment="审核状态: draft/reviewed/published")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class ActionParameter(Base):
     """操作参数 - 操作的输入输出参数定义 (殷明: rc_ai_action_parameter)"""
-    __tablename__ = "ai_action_parameter"
+    __tablename__ = "rc_ai_action_parameter"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     action_id = Column(BigInteger, nullable=False, index=True, comment="所属操作ID")
@@ -60,5 +65,9 @@ class ActionParameter(Base):
     is_required = Column(Boolean, default=False, comment="是否必填")
     default_value = Column(String(256), comment="默认值")
     value_type = Column(String(32), default="none", comment="取值方式: none/fixed/count/sum/local_func")
+    # v6 新增字段
+    enum_values = Column(JSON, comment="枚举值")
+    semantic_role = Column(String(16), comment="语义角色: identifier/status/scope/timestamp/metric/label/content")
+    generated_by = Column(String(16), default="manual", comment="数据来源: manual/llm")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

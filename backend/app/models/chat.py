@@ -7,7 +7,7 @@ from app.database import Base
 
 class ChatSession(Base):
     """会话记录"""
-    __tablename__ = "ai_chat_session"
+    __tablename__ = "rc_ai_chat_session"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     session_id = Column(String(64), nullable=False, unique=True, comment="会话唯一标识")
@@ -24,7 +24,7 @@ class ChatSession(Base):
 
 class ChatMessage(Base):
     """对话消息记录"""
-    __tablename__ = "ai_chat_message"
+    __tablename__ = "rc_ai_chat_message"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     session_id = Column(String(64), nullable=False, index=True, comment="会话ID")
@@ -44,7 +44,7 @@ class ChatMessage(Base):
 
 class ActionLog(Base):
     """动作执行日志"""
-    __tablename__ = "ai_action_log"
+    __tablename__ = "rc_ai_action_log"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     session_id = Column(String(64), nullable=False, index=True, comment="会话ID")

@@ -35,6 +35,7 @@ from app.core import pipeline
 from app.kernel.scope import BeaverSessionScope
 from app.kernel.capability import CapabilityRegistry
 from app.kernel.policy import PolicyGuard
+from app.models.execution_log import ExecutionLog
 
 logger = logging.getLogger("beaver.engine")
 
@@ -48,6 +49,7 @@ async def stream_dialog(
     thread_id: str,
     run_id: str,
     scope: BeaverSessionScope = None,
+    session_headers: dict = None,
 ) -> AsyncGenerator[str, None]:
     """主入口 - 流式返回 AG-UI SSE 事件"""
     scope = scope or BeaverSessionScope()
@@ -59,6 +61,7 @@ async def stream_dialog(
         async for evt in _stream_dialog_inner(
             db, tenant_id, customer_id, session_id, message,
             thread_id, run_id, evidence, scope,
+            session_headers=session_headers,
         ):
             yield evt
     except Exception as exc:
@@ -91,6 +94,7 @@ async def _stream_dialog_inner(
     run_id: str,
     evidence: EvidenceCollector,
     scope: BeaverSessionScope = None,
+    session_headers: dict = None,
 ) -> AsyncGenerator[str, None]:
 
     # -- Step 1: 加载上下文 --
@@ -314,6 +318,7 @@ async def _stream_dialog_inner(
         executor = WorkflowExecutor(
             db=db, skill=matched_skill, entities=entities,
             customer_id=customer_id, tenant_id=tenant_id, evidence=evidence,
+            session_headers=session_headers,
         )
         for evt in executor.execute():
             yield evt
@@ -375,13 +380,32 @@ async def _stream_dialog_inner(
         if idx >= max_calls:
             evidence.add_step("tool_limit", {"max_tool_calls": max_calls, "skipped": len(tools) - idx})
             break
-        tool_result = _execute_tool_with_events(db, tool, entities, customer_id, evidence)
+        t_tool = time.time()
+        tool_result = _execute_tool_with_events(db, tool, entities, customer_id, evidence, session_headers=session_headers)
+        tool_duration = int((time.time() - t_tool) * 1000)
         for evt in tool_result["events"]:
             yield evt
         if tool_result["data"]:
             query_results[f"tool_{tool.order_no}"] = tool_result["data"]
         if tool_result.get("response_description"):
             response_descriptions.append(tool_result["response_description"])
+
+        # 记录 ExecutionLog
+        action_obj = None
+        adapter_id = None
+        if tool.action_id:
+            action_obj = db.query(Action).filter(Action.id == tool.action_id).first()
+        if action_obj and action_obj.connector_id:
+            adapter_id = action_obj.connector_id
+        _log_execution(
+            db, session_id, message, matched_skill, tool, action_obj, adapter_id,
+            input_params=entities,
+            output_data=tool_result.get("data"),
+            success=tool_result.get("data") is not None,
+            error_msg=None,
+            duration_ms=tool_duration,
+            session_headers=session_headers,
+        )
 
     evidence.add_step("tool_execution", {
         "tools_count": len(tools),
@@ -694,9 +718,55 @@ def _build_param_mapping(db: Session, action_id: int) -> Optional[dict]:
     return pipeline.build_param_mapping(db, action_id)
 
 
+def _log_execution(
+    db: Session, session_id: str, message: str,
+    skill, tool, action, adapter_id,
+    input_params: dict, output_data, success: bool,
+    error_msg: str = None, duration_ms: int = 0,
+    session_headers: dict = None,
+):
+    """记录 execution_log — 静默失败，不影响主流程"""
+    try:
+        user_context = None
+        if session_headers:
+            # session_headers 来自 Redis Session，其中可能携带用户上下文
+            # 但不存储敏感的 headers 本身
+            pass
+        log = ExecutionLog(
+            session_id=session_id,
+            user_input=message,
+            skill_id=getattr(skill, "id", None),
+            tool_id=getattr(tool, "id", None),
+            entity_id=getattr(action, "entity_id", None) if action else None,
+            action_id=getattr(action, "id", None) if action else None,
+            adapter_id=adapter_id,
+            input_params=input_params,
+            output_data=_truncate_output(output_data),
+            user_context=user_context,
+            success=success,
+            error_message=error_msg,
+            duration_ms=duration_ms,
+        )
+        db.add(log)
+        db.flush()
+    except Exception as e:
+        logger.debug("execution_log write failed: %s", e)
+
+
+def _truncate_output(data, max_len=2000):
+    """截断 output_data，避免存储过大 JSON"""
+    if data is None:
+        return None
+    s = json.dumps(data, ensure_ascii=False, default=str)
+    if len(s) > max_len:
+        return {"_truncated": True, "preview": s[:max_len]}
+    return data
+
+
 def _execute_tool_with_events(
     db: Session, tool: SkillTool, entities: dict, customer_id: str,
     evidence: EvidenceCollector = None,
+    session_headers: dict = None,
 ) -> dict:
     """执行单个工具, 返回 { events: [...], data: ... }"""
     events = []
@@ -723,6 +793,7 @@ def _execute_tool_with_events(
                 "auth_config": connector.auth_config,
                 "timeout": connector.timeout,
                 "mock_enabled": connector.mock_enabled,
+                "session_headers": session_headers,
             })
             try:
                 result = cli.call_action(
@@ -834,6 +905,7 @@ def _execute_tool_with_events(
         "auth_config": connector.auth_config,
         "timeout": connector.timeout,
         "mock_enabled": connector.mock_enabled,
+        "session_headers": session_headers,
     })
 
     try:

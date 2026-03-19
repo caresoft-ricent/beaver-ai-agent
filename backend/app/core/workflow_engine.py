@@ -64,6 +64,7 @@ class WorkflowExecutor:
         customer_id: str,
         tenant_id: int,
         evidence: EvidenceCollector,
+        session_headers: dict = None,
     ):
         self.db = db
         self.skill = skill
@@ -71,6 +72,7 @@ class WorkflowExecutor:
         self.customer_id = customer_id
         self.tenant_id = tenant_id
         self.evidence = evidence
+        self.session_headers = session_headers
 
         cfg = skill.workflow_config or {}
         self.nodes = {n["id"]: n for n in cfg.get("nodes", [])}
@@ -186,6 +188,7 @@ class WorkflowExecutor:
                 "auth_config": connector.auth_config,
                 "timeout": connector.timeout,
                 "mock_enabled": connector.mock_enabled,
+                "session_headers": self.session_headers,
             })
             try:
                 result = cli.call_action(

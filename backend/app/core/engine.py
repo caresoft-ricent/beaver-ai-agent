@@ -38,11 +38,12 @@ class DialogEngine:
     """配置驱动的对话引擎"""
 
     def __init__(self, db: Session, tenant_id: int, customer_id: str,
-                 scope: BeaverSessionScope = None):
+                 scope: BeaverSessionScope = None, session_headers: dict = None):
         self.db = db
         self.tenant_id = tenant_id
         self.customer_id = customer_id
         self.scope = scope or BeaverSessionScope()
+        self.session_headers = session_headers
         self.evidence = None
 
     def process(self, session_id: str, message: str) -> EngineResult:
@@ -176,6 +177,7 @@ class DialogEngine:
                 "auth_config": connector.auth_config,
                 "timeout": connector.timeout,
                 "mock_enabled": connector.mock_enabled,
+                "session_headers": self.session_headers,
             })
             try:
                 result = client.call_action(
@@ -254,6 +256,7 @@ class DialogEngine:
             "auth_config": connector.auth_config,
             "timeout": connector.timeout,
             "mock_enabled": connector.mock_enabled,
+            "session_headers": self.session_headers,
         })
 
         try:

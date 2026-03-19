@@ -34,14 +34,14 @@ class TestMessageCountAtomicUpdate:
 
         # 模拟 /stream 端点的原子 UPDATE
         db.execute(
-            text("UPDATE ai_chat_session SET message_count = message_count + 2 WHERE session_id = :sid"),
+            text("UPDATE rc_ai_chat_session SET message_count = message_count + 2 WHERE session_id = :sid"),
             {"sid": "sess_mc_test_01"},
         )
         db.commit()
 
         # 验证
         row = db.execute(
-            text("SELECT message_count FROM ai_chat_session WHERE session_id = :sid"),
+            text("SELECT message_count FROM rc_ai_chat_session WHERE session_id = :sid"),
             {"sid": "sess_mc_test_01"},
         ).fetchone()
         assert row[0] == 2
@@ -60,13 +60,13 @@ class TestMessageCountAtomicUpdate:
         # 3 轮对话
         for _ in range(3):
             db.execute(
-                text("UPDATE ai_chat_session SET message_count = message_count + 2 WHERE session_id = :sid"),
+                text("UPDATE rc_ai_chat_session SET message_count = message_count + 2 WHERE session_id = :sid"),
                 {"sid": "sess_mc_test_02"},
             )
             db.commit()
 
         row = db.execute(
-            text("SELECT message_count FROM ai_chat_session WHERE session_id = :sid"),
+            text("SELECT message_count FROM rc_ai_chat_session WHERE session_id = :sid"),
             {"sid": "sess_mc_test_02"},
         ).fetchone()
         assert row[0] == 6

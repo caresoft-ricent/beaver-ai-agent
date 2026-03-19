@@ -32,8 +32,16 @@ class ConnectorClient:
         self.auth_config = connector_config.get("auth_config") or {}
         self.timeout = connector_config.get("timeout", 30)
         self.mock_enabled = connector_config.get("mock_enabled", "0") == "1"
+        # v6: Session headers（河狸云打包好的完整请求头）
+        self._session_headers = connector_config.get("session_headers")
 
     def _build_headers(self) -> dict:
+        # 优先：从 Session 获取河狸云打包好的完整 headers
+        if self._session_headers:
+            headers = dict(self._session_headers)
+            headers.setdefault("Content-Type", "application/json")
+            return headers
+        # 兼容：无 Session 时用老方式
         headers = {"Content-Type": "application/json"}
         if self.auth_type == "api_key":
             header_name = self.auth_config.get("header_name", "Authorization")

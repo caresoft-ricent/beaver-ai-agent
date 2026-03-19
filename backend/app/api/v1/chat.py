@@ -1,5 +1,7 @@
 """对话API - 客户侧使用"""
+from __future__ import annotations
 import json
+import logging
 import uuid
 import time
 from fastapi import APIRouter, Depends, Request
@@ -14,8 +16,22 @@ from app.schemas.common import ResponseBase
 from app.core.stream_engine import stream_dialog
 from app.core import agui
 from app.kernel.scope import BeaverSessionScope, extract_scope
+from app.api.session_routes import get_session_manager
 
+logger = logging.getLogger("beaver.chat")
 router = APIRouter()
+
+
+async def _get_session_headers(session_id: str) -> dict | None:
+    """从 Redis 查找会话的 headers（河狸云身份头），找不到返回 None（兼容旧模式）"""
+    try:
+        sm = await get_session_manager()
+        session = await sm.get(session_id)
+        if session and session.get("headers"):
+            return session["headers"]
+    except Exception as e:
+        logger.debug("get_session_headers failed session_id=%s: %s", session_id, e)
+    return None
 
 
 @router.post("/completions")
@@ -53,6 +69,9 @@ async def chat_completions(req: ChatRequest, request: Request, db: Session = Dep
     thread_id = session.session_id
     run_id = f"run_{uuid.uuid4().hex[:8]}"
 
+    # 从 Redis Session 获取河狸云身份头
+    session_headers = await _get_session_headers(session.session_id)
+
     collected_text: list[str] = []
     collected_intent: str | None = None
     collected_data: dict | None = None
@@ -69,6 +88,7 @@ async def chat_completions(req: ChatRequest, request: Request, db: Session = Dep
         thread_id=thread_id,
         run_id=run_id,
         scope=scope,
+        session_headers=session_headers,
     ):
         if '"TEXT_MESSAGE_CONTENT"' in event_str:
             try:
@@ -162,6 +182,9 @@ async def chat_stream(req: AGUIStreamRequest, request: Request, db: Session = De
     thread_id = session.session_id
     run_id = req.run_id or agui.new_id()
 
+    # 从 Redis Session 获取河狸云身份头
+    session_headers = await _get_session_headers(session.session_id)
+
     # 收集全部回复文本用于存库
     collected_text: list[str] = []
     collected_intent: str | None = None
@@ -179,6 +202,7 @@ async def chat_stream(req: AGUIStreamRequest, request: Request, db: Session = De
             thread_id=thread_id,
             run_id=run_id,
             scope=scope,
+            session_headers=session_headers,
         ):
             # 拦截内容用于存库
             if '"TEXT_MESSAGE_CONTENT"' in event_str:
@@ -218,7 +242,7 @@ async def chat_stream(req: AGUIStreamRequest, request: Request, db: Session = De
             db.add(ai_msg)
             # 使用原子 SQL UPDATE 避免 ORM 对象在异步生成器中失效导致 message_count 始终为 0
             db.execute(
-                text("UPDATE ai_chat_session SET message_count = message_count + 2 WHERE session_id = :sid"),
+                text("UPDATE rc_ai_chat_session SET message_count = message_count + 2 WHERE session_id = :sid"),
                 {"sid": session.session_id},
             )
             db.commit()

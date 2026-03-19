@@ -13,7 +13,7 @@ from app.database import Base
 
 class NormalizationRule(Base):
     """归一化规则配置"""
-    __tablename__ = "ai_normalization_rule"
+    __tablename__ = "rc_ai_normalization_rule"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     tenant_id = Column(BigInteger, nullable=False, index=True, default=0, comment="租户ID, 0=全局")

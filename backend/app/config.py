@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     app_debug: bool = True
     app_port: int = 8000
 
+    # Beaver Cloud WebAPI（身份验证）
+    app_secret: str = ""
+    app_retrieve_url: str = ""
+
     @property
     def database_url(self) -> str:
         return (
