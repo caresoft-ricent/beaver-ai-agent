@@ -41,33 +41,43 @@ const ROOM_DATA: Record<string, RoomDef> = {
     name: '客厅', label: '客 厅',
     pano: '/yuanyang/living.jpg',
     categories: [
-      { id: 'floor', name: '地面', icon: '◫', options: [
-        { id: 'lf1', name: '爵士白大理石', brand: '诺贝尔', model: 'W63012', price: 428, unit: '㎡', qty: 35, color: '#e8e4df', accent: '#d4cfc8', pat: 'marble' },
-        { id: 'lf2', name: '北美白橡木地板', brand: '大自然', model: 'DSQ001', price: 368, unit: '㎡', qty: 35, color: '#c4a97d', accent: '#b89968', pat: 'wood' },
-        { id: 'lf3', name: '莫兰迪灰瓷砖', brand: '马可波罗', model: 'FG8025', price: 298, unit: '㎡', qty: 35, color: '#a8a09a', accent: '#9b938d', pat: 'tile' },
-        { id: 'lf4', name: '水磨石', brand: '蒙娜丽莎', model: 'TS6601', price: 358, unit: '㎡', qty: 35, color: '#d6d0c8', accent: '#bfb8ae', pat: 'terrazzo' },
-      ]},
-      { id: 'wall', name: '墙面', icon: '▦', options: [
-        { id: 'lw1', name: '云白乳胶漆', brand: '多乐士', model: 'A991', price: 65, unit: '㎡', qty: 82, color: '#f5f2ee', accent: '#f5f2ee', pat: 'solid' },
-        { id: 'lw2', name: '暖灰微水泥', brand: '磐多魔', model: 'MC-G03', price: 320, unit: '㎡', qty: 82, color: '#c8c0b8', accent: '#bdb5ac', pat: 'concrete' },
-        { id: 'lw3', name: '白栎木饰面', brand: '科定', model: 'KD-S12', price: 480, unit: '㎡', qty: 82, color: '#d4c5a9', accent: '#c9ba9a', pat: 'woodpanel' },
-        { id: 'lw4', name: '鼠尾草绿', brand: '本杰明摩尔', model: 'HC-114', price: 88, unit: '㎡', qty: 82, color: '#b5bfa8', accent: '#a8b29b', pat: 'solid' },
-      ]},
-      { id: 'tvwall', name: '背景墙', icon: '▣', options: [
-        { id: 'lt1', name: '岩板一体背景', brand: '德利丰', model: 'YB-8201', price: 12800, unit: '套', qty: 1, color: '#6b6560', accent: '#5c5650', pat: 'slate' },
-        { id: 'lt2', name: '黑胡桃木格栅', brand: '科定', model: 'KD-TV06', price: 8600, unit: '套', qty: 1, color: '#5c4a3a', accent: '#4d3d2e', pat: 'slat' },
-        { id: 'lt3', name: '大理石+金属', brand: '诺贝尔', model: 'TV-M01', price: 15800, unit: '套', qty: 1, color: '#ddd8d0', accent: '#c5a86c', pat: 'marblemetal' },
-      ]},
-      { id: 'sofa', name: '沙发', icon: '⊏', options: [
-        { id: 'ls1', name: '烟灰L型布艺', brand: 'HAY', model: 'MAGS-L', price: 28600, unit: '套', qty: 1, color: '#8a8580', accent: '#7d7873', pat: 'fabric' },
-        { id: 'ls2', name: '奶油白意式真皮', brand: 'Natuzzi', model: 'IAGO', price: 42000, unit: '套', qty: 1, color: '#ede5d8', accent: '#e0d8ca', pat: 'leather' },
-        { id: 'ls3', name: '复古绿丝绒', brand: 'Cassina', model: 'MARA', price: 56000, unit: '套', qty: 1, color: '#5a7a62', accent: '#4d6b54', pat: 'velvet' },
-      ]},
-      { id: 'light', name: '主灯', icon: '◉', options: [
-        { id: 'll1', name: '无主灯设计', brand: '三雄极光', model: 'NL-S01', price: 6800, unit: '套', qty: 1, color: '#fff8e7', accent: '#fff3d4', pat: 'recessed' },
-        { id: 'll2', name: '黄铜球形吊灯', brand: 'FLOS', model: 'IC-S2', price: 12800, unit: '套', qty: 1, color: '#c5a86c', accent: '#b89755', pat: 'pendant' },
-        { id: 'll3', name: '极简线性灯', brand: 'VIBIA', model: 'HALO', price: 8900, unit: '套', qty: 1, color: '#f0ede8', accent: '#fff8e7', pat: 'linear' },
-      ]},
+      {
+        id: 'floor', name: '地面', icon: '◫', options: [
+          { id: 'lf1', name: '爵士白大理石', brand: '诺贝尔', model: 'W63012', price: 428, unit: '㎡', qty: 35, color: '#e8e4df', accent: '#d4cfc8', pat: 'marble' },
+          { id: 'lf2', name: '北美白橡木地板', brand: '大自然', model: 'DSQ001', price: 368, unit: '㎡', qty: 35, color: '#c4a97d', accent: '#b89968', pat: 'wood' },
+          { id: 'lf3', name: '莫兰迪灰瓷砖', brand: '马可波罗', model: 'FG8025', price: 298, unit: '㎡', qty: 35, color: '#a8a09a', accent: '#9b938d', pat: 'tile' },
+          { id: 'lf4', name: '水磨石', brand: '蒙娜丽莎', model: 'TS6601', price: 358, unit: '㎡', qty: 35, color: '#d6d0c8', accent: '#bfb8ae', pat: 'terrazzo' },
+        ]
+      },
+      {
+        id: 'wall', name: '墙面', icon: '▦', options: [
+          { id: 'lw1', name: '云白乳胶漆', brand: '多乐士', model: 'A991', price: 65, unit: '㎡', qty: 82, color: '#f5f2ee', accent: '#f5f2ee', pat: 'solid' },
+          { id: 'lw2', name: '暖灰微水泥', brand: '磐多魔', model: 'MC-G03', price: 320, unit: '㎡', qty: 82, color: '#c8c0b8', accent: '#bdb5ac', pat: 'concrete' },
+          { id: 'lw3', name: '白栎木饰面', brand: '科定', model: 'KD-S12', price: 480, unit: '㎡', qty: 82, color: '#d4c5a9', accent: '#c9ba9a', pat: 'woodpanel' },
+          { id: 'lw4', name: '鼠尾草绿', brand: '本杰明摩尔', model: 'HC-114', price: 88, unit: '㎡', qty: 82, color: '#b5bfa8', accent: '#a8b29b', pat: 'solid' },
+        ]
+      },
+      {
+        id: 'tvwall', name: '背景墙', icon: '▣', options: [
+          { id: 'lt1', name: '岩板一体背景', brand: '德利丰', model: 'YB-8201', price: 12800, unit: '套', qty: 1, color: '#6b6560', accent: '#5c5650', pat: 'slate' },
+          { id: 'lt2', name: '黑胡桃木格栅', brand: '科定', model: 'KD-TV06', price: 8600, unit: '套', qty: 1, color: '#5c4a3a', accent: '#4d3d2e', pat: 'slat' },
+          { id: 'lt3', name: '大理石+金属', brand: '诺贝尔', model: 'TV-M01', price: 15800, unit: '套', qty: 1, color: '#ddd8d0', accent: '#c5a86c', pat: 'marblemetal' },
+        ]
+      },
+      {
+        id: 'sofa', name: '沙发', icon: '⊏', options: [
+          { id: 'ls1', name: '烟灰L型布艺', brand: 'HAY', model: 'MAGS-L', price: 28600, unit: '套', qty: 1, color: '#8a8580', accent: '#7d7873', pat: 'fabric' },
+          { id: 'ls2', name: '奶油白意式真皮', brand: 'Natuzzi', model: 'IAGO', price: 42000, unit: '套', qty: 1, color: '#ede5d8', accent: '#e0d8ca', pat: 'leather' },
+          { id: 'ls3', name: '复古绿丝绒', brand: 'Cassina', model: 'MARA', price: 56000, unit: '套', qty: 1, color: '#5a7a62', accent: '#4d6b54', pat: 'velvet' },
+        ]
+      },
+      {
+        id: 'light', name: '主灯', icon: '◉', options: [
+          { id: 'll1', name: '无主灯设计', brand: '三雄极光', model: 'NL-S01', price: 6800, unit: '套', qty: 1, color: '#fff8e7', accent: '#fff3d4', pat: 'recessed' },
+          { id: 'll2', name: '黄铜球形吊灯', brand: 'FLOS', model: 'IC-S2', price: 12800, unit: '套', qty: 1, color: '#c5a86c', accent: '#b89755', pat: 'pendant' },
+          { id: 'll3', name: '极简线性灯', brand: 'VIBIA', model: 'HALO', price: 8900, unit: '套', qty: 1, color: '#f0ede8', accent: '#fff8e7', pat: 'linear' },
+        ]
+      },
     ],
     defaults: { floor: 'lf1', wall: 'lw1', tvwall: 'lt1', sofa: 'ls1', light: 'll1' },
   },
@@ -75,31 +85,41 @@ const ROOM_DATA: Record<string, RoomDef> = {
     name: '一楼卧室', label: '一楼卧室',
     pano: '/yuanyang/bedroom1f.jpg',
     categories: [
-      { id: 'floor', name: '地面', icon: '◫', options: [
-        { id: 'b1f1', name: '胡桃木地板', brand: '大自然', model: 'HT-W01', price: 458, unit: '㎡', qty: 18, color: '#8b7355', accent: '#7a6348', pat: 'wood' },
-        { id: 'b1f2', name: '奶油色橡木地板', brand: '圣象', model: 'NK1008', price: 388, unit: '㎡', qty: 18, color: '#d4c5a9', accent: '#c4b595', pat: 'wood' },
-        { id: 'b1f3', name: '浅灰瓷砖', brand: '东鹏', model: 'LN60', price: 268, unit: '㎡', qty: 18, color: '#c8c3bd', accent: '#b8b3ac', pat: 'tile' },
-      ]},
-      { id: 'wall', name: '墙面', icon: '▦', options: [
-        { id: 'b1w1', name: '暖白乳胶漆', brand: '多乐士', model: 'N991', price: 65, unit: '㎡', qty: 48, color: '#f8f4ef', accent: '#f8f4ef', pat: 'solid' },
-        { id: 'b1w2', name: '莫兰迪粉', brand: '本杰明摩尔', model: 'HC-63', price: 88, unit: '㎡', qty: 48, color: '#e0cfc5', accent: '#d4c3b8', pat: 'solid' },
-        { id: 'b1w3', name: '薄荷灰绿', brand: '芬琳', model: 'F487', price: 92, unit: '㎡', qty: 48, color: '#c5cfc5', accent: '#b8c2b8', pat: 'solid' },
-      ]},
-      { id: 'bedwall', name: '床头背景', icon: '▣', options: [
-        { id: 'b1bw1', name: '皮革软包', brand: 'CBD', model: 'BP-01', price: 6800, unit: '套', qty: 1, color: '#a08870', accent: '#8a7560', pat: 'leather' },
-        { id: 'b1bw2', name: '木饰面+灯带', brand: '科定', model: 'KD-B05', price: 8200, unit: '套', qty: 1, color: '#8b7355', accent: '#fff8e7', pat: 'woodlight' },
-        { id: 'b1bw3', name: '艺术涂料', brand: '瓦帕', model: 'AT-12', price: 5600, unit: '套', qty: 1, color: '#b8a898', accent: '#a89888', pat: 'artpaint' },
-      ]},
-      { id: 'bed', name: '床', icon: '▭', options: [
-        { id: 'b1bd1', name: '布艺软床 1.5m', brand: 'CBD', model: 'D028', price: 9800, unit: '套', qty: 1, color: '#c8bfb5', accent: '#b8afa5', pat: 'fabric' },
-        { id: 'b1bd2', name: '真皮软床 1.5m', brand: '慕思', model: 'V6-T226', price: 15600, unit: '套', qty: 1, color: '#8a7a6a', accent: '#7a6a5a', pat: 'leather' },
-        { id: 'b1bd3', name: '实木框架床 1.5m', brand: '源氏木语', model: 'Y8602', price: 6800, unit: '套', qty: 1, color: '#a08060', accent: '#c4a97d', pat: 'woodframe' },
-      ]},
-      { id: 'wardrobe', name: '衣柜', icon: '⊞', options: [
-        { id: 'b1wr1', name: '白色极简平开门', brand: '索菲亚', model: 'WR-W01', price: 12800, unit: '套', qty: 1, color: '#f0ece6', accent: '#e8e4de', pat: 'white' },
-        { id: 'b1wr2', name: '木纹推拉门', brand: '欧派', model: 'WR-M02', price: 10200, unit: '套', qty: 1, color: '#a08060', accent: '#8b7050', pat: 'woodslide' },
-        { id: 'b1wr3', name: '玻璃+金属框', brand: '好莱客', model: 'WR-G03', price: 15800, unit: '套', qty: 1, color: '#d8d4d0', accent: '#888', pat: 'glass' },
-      ]},
+      {
+        id: 'floor', name: '地面', icon: '◫', options: [
+          { id: 'b1f1', name: '胡桃木地板', brand: '大自然', model: 'HT-W01', price: 458, unit: '㎡', qty: 18, color: '#8b7355', accent: '#7a6348', pat: 'wood' },
+          { id: 'b1f2', name: '奶油色橡木地板', brand: '圣象', model: 'NK1008', price: 388, unit: '㎡', qty: 18, color: '#d4c5a9', accent: '#c4b595', pat: 'wood' },
+          { id: 'b1f3', name: '浅灰瓷砖', brand: '东鹏', model: 'LN60', price: 268, unit: '㎡', qty: 18, color: '#c8c3bd', accent: '#b8b3ac', pat: 'tile' },
+        ]
+      },
+      {
+        id: 'wall', name: '墙面', icon: '▦', options: [
+          { id: 'b1w1', name: '暖白乳胶漆', brand: '多乐士', model: 'N991', price: 65, unit: '㎡', qty: 48, color: '#f8f4ef', accent: '#f8f4ef', pat: 'solid' },
+          { id: 'b1w2', name: '莫兰迪粉', brand: '本杰明摩尔', model: 'HC-63', price: 88, unit: '㎡', qty: 48, color: '#e0cfc5', accent: '#d4c3b8', pat: 'solid' },
+          { id: 'b1w3', name: '薄荷灰绿', brand: '芬琳', model: 'F487', price: 92, unit: '㎡', qty: 48, color: '#c5cfc5', accent: '#b8c2b8', pat: 'solid' },
+        ]
+      },
+      {
+        id: 'bedwall', name: '床头背景', icon: '▣', options: [
+          { id: 'b1bw1', name: '皮革软包', brand: 'CBD', model: 'BP-01', price: 6800, unit: '套', qty: 1, color: '#a08870', accent: '#8a7560', pat: 'leather' },
+          { id: 'b1bw2', name: '木饰面+灯带', brand: '科定', model: 'KD-B05', price: 8200, unit: '套', qty: 1, color: '#8b7355', accent: '#fff8e7', pat: 'woodlight' },
+          { id: 'b1bw3', name: '艺术涂料', brand: '瓦帕', model: 'AT-12', price: 5600, unit: '套', qty: 1, color: '#b8a898', accent: '#a89888', pat: 'artpaint' },
+        ]
+      },
+      {
+        id: 'bed', name: '床', icon: '▭', options: [
+          { id: 'b1bd1', name: '布艺软床 1.5m', brand: 'CBD', model: 'D028', price: 9800, unit: '套', qty: 1, color: '#c8bfb5', accent: '#b8afa5', pat: 'fabric' },
+          { id: 'b1bd2', name: '真皮软床 1.5m', brand: '慕思', model: 'V6-T226', price: 15600, unit: '套', qty: 1, color: '#8a7a6a', accent: '#7a6a5a', pat: 'leather' },
+          { id: 'b1bd3', name: '实木框架床 1.5m', brand: '源氏木语', model: 'Y8602', price: 6800, unit: '套', qty: 1, color: '#a08060', accent: '#c4a97d', pat: 'woodframe' },
+        ]
+      },
+      {
+        id: 'wardrobe', name: '衣柜', icon: '⊞', options: [
+          { id: 'b1wr1', name: '白色极简平开门', brand: '索菲亚', model: 'WR-W01', price: 12800, unit: '套', qty: 1, color: '#f0ece6', accent: '#e8e4de', pat: 'white' },
+          { id: 'b1wr2', name: '木纹推拉门', brand: '欧派', model: 'WR-M02', price: 10200, unit: '套', qty: 1, color: '#a08060', accent: '#8b7050', pat: 'woodslide' },
+          { id: 'b1wr3', name: '玻璃+金属框', brand: '好莱客', model: 'WR-G03', price: 15800, unit: '套', qty: 1, color: '#d8d4d0', accent: '#888', pat: 'glass' },
+        ]
+      },
     ],
     defaults: { floor: 'b1f1', wall: 'b1w1', bedwall: 'b1bw1', bed: 'b1bd1', wardrobe: 'b1wr1' },
   },
@@ -107,31 +127,41 @@ const ROOM_DATA: Record<string, RoomDef> = {
     name: '一楼次卫', label: '一楼次卫',
     pano: '/yuanyang/bath1f.jpg',
     categories: [
-      { id: 'floor', name: '地砖', icon: '◫', options: [
-        { id: 'bt1f1', name: '防滑深灰砖', brand: '诺贝尔', model: 'BF-D01', price: 248, unit: '㎡', qty: 5, color: '#7a7570', accent: '#6a6560', pat: 'tile' },
-        { id: 'bt1f2', name: '木纹防滑砖', brand: '马可波罗', model: 'BF-W02', price: 288, unit: '㎡', qty: 5, color: '#a89880', accent: '#988870', pat: 'wood' },
-        { id: 'bt1f3', name: '水磨石砖', brand: '蒙娜丽莎', model: 'BF-T03', price: 328, unit: '㎡', qty: 5, color: '#c8c2ba', accent: '#b8b2aa', pat: 'terrazzo' },
-      ]},
-      { id: 'wall', name: '墙砖', icon: '▦', options: [
-        { id: 'bt1w1', name: '白色亮面砖', brand: '东鹏', model: 'BW-W01', price: 168, unit: '㎡', qty: 18, color: '#f0ece8', accent: '#e8e4e0', pat: 'glossy' },
-        { id: 'bt1w2', name: '浅灰哑光砖', brand: '诺贝尔', model: 'BW-G02', price: 198, unit: '㎡', qty: 18, color: '#c8c4c0', accent: '#bab6b2', pat: 'matte' },
-        { id: 'bt1w3', name: '奶油色微水泥', brand: '磐多魔', model: 'BW-C03', price: 380, unit: '㎡', qty: 18, color: '#ddd5ca', accent: '#cec6ba', pat: 'concrete' },
-      ]},
-      { id: 'vanity', name: '浴室柜', icon: '▤', options: [
-        { id: 'bt1v1', name: '白色悬挂式 80cm', brand: 'TOTO', model: 'LDSW601', price: 8800, unit: '套', qty: 1, color: '#f0ece6', accent: '#e5e0da', pat: 'white' },
-        { id: 'bt1v2', name: '木纹落地式 100cm', brand: '箭牌', model: 'AE2507', price: 6200, unit: '套', qty: 1, color: '#a08060', accent: '#8b7050', pat: 'wood' },
-        { id: 'bt1v3', name: '岩板一体盆 90cm', brand: '恒洁', model: 'HBM-801', price: 12800, unit: '套', qty: 1, color: '#8a8580', accent: '#7a7570', pat: 'sintered' },
-      ]},
-      { id: 'toilet', name: '马桶', icon: '◯', options: [
-        { id: 'bt1t1', name: '智能马桶一体机', brand: 'TOTO', model: 'CES99', price: 16800, unit: '台', qty: 1, color: '#f5f2ef', accent: '#eae7e2', pat: 'smart' },
-        { id: 'bt1t2', name: '壁挂式马桶', brand: '杜拉维特', model: 'ME-252009', price: 12600, unit: '台', qty: 1, color: '#f0ede8', accent: '#e5e2dc', pat: 'wallhung' },
-        { id: 'bt1t3', name: '普通连体马桶', brand: '科勒', model: 'K-5171T', price: 4800, unit: '台', qty: 1, color: '#f2efea', accent: '#e8e5e0', pat: 'standard' },
-      ]},
-      { id: 'shower', name: '淋浴', icon: '⊕', options: [
-        { id: 'bt1s1', name: '恒温花洒套装', brand: '汉斯格雅', model: 'RD-S240', price: 8800, unit: '套', qty: 1, color: '#c0c0c5', accent: '#aaaaaf', pat: 'chrome' },
-        { id: 'bt1s2', name: '黑色暗装花洒', brand: '科勒', model: 'K-77982T', price: 12800, unit: '套', qty: 1, color: '#3a3a3a', accent: '#2a2a2a', pat: 'black' },
-        { id: 'bt1s3', name: '钢琴键花洒系统', brand: '摩恩', model: 'PK-600', price: 6800, unit: '套', qty: 1, color: '#e0e0e2', accent: '#d0d0d2', pat: 'piano' },
-      ]},
+      {
+        id: 'floor', name: '地砖', icon: '◫', options: [
+          { id: 'bt1f1', name: '防滑深灰砖', brand: '诺贝尔', model: 'BF-D01', price: 248, unit: '㎡', qty: 5, color: '#7a7570', accent: '#6a6560', pat: 'tile' },
+          { id: 'bt1f2', name: '木纹防滑砖', brand: '马可波罗', model: 'BF-W02', price: 288, unit: '㎡', qty: 5, color: '#a89880', accent: '#988870', pat: 'wood' },
+          { id: 'bt1f3', name: '水磨石砖', brand: '蒙娜丽莎', model: 'BF-T03', price: 328, unit: '㎡', qty: 5, color: '#c8c2ba', accent: '#b8b2aa', pat: 'terrazzo' },
+        ]
+      },
+      {
+        id: 'wall', name: '墙砖', icon: '▦', options: [
+          { id: 'bt1w1', name: '白色亮面砖', brand: '东鹏', model: 'BW-W01', price: 168, unit: '㎡', qty: 18, color: '#f0ece8', accent: '#e8e4e0', pat: 'glossy' },
+          { id: 'bt1w2', name: '浅灰哑光砖', brand: '诺贝尔', model: 'BW-G02', price: 198, unit: '㎡', qty: 18, color: '#c8c4c0', accent: '#bab6b2', pat: 'matte' },
+          { id: 'bt1w3', name: '奶油色微水泥', brand: '磐多魔', model: 'BW-C03', price: 380, unit: '㎡', qty: 18, color: '#ddd5ca', accent: '#cec6ba', pat: 'concrete' },
+        ]
+      },
+      {
+        id: 'vanity', name: '浴室柜', icon: '▤', options: [
+          { id: 'bt1v1', name: '白色悬挂式 80cm', brand: 'TOTO', model: 'LDSW601', price: 8800, unit: '套', qty: 1, color: '#f0ece6', accent: '#e5e0da', pat: 'white' },
+          { id: 'bt1v2', name: '木纹落地式 100cm', brand: '箭牌', model: 'AE2507', price: 6200, unit: '套', qty: 1, color: '#a08060', accent: '#8b7050', pat: 'wood' },
+          { id: 'bt1v3', name: '岩板一体盆 90cm', brand: '恒洁', model: 'HBM-801', price: 12800, unit: '套', qty: 1, color: '#8a8580', accent: '#7a7570', pat: 'sintered' },
+        ]
+      },
+      {
+        id: 'toilet', name: '马桶', icon: '◯', options: [
+          { id: 'bt1t1', name: '智能马桶一体机', brand: 'TOTO', model: 'CES99', price: 16800, unit: '台', qty: 1, color: '#f5f2ef', accent: '#eae7e2', pat: 'smart' },
+          { id: 'bt1t2', name: '壁挂式马桶', brand: '杜拉维特', model: 'ME-252009', price: 12600, unit: '台', qty: 1, color: '#f0ede8', accent: '#e5e2dc', pat: 'wallhung' },
+          { id: 'bt1t3', name: '普通连体马桶', brand: '科勒', model: 'K-5171T', price: 4800, unit: '台', qty: 1, color: '#f2efea', accent: '#e8e5e0', pat: 'standard' },
+        ]
+      },
+      {
+        id: 'shower', name: '淋浴', icon: '⊕', options: [
+          { id: 'bt1s1', name: '恒温花洒套装', brand: '汉斯格雅', model: 'RD-S240', price: 8800, unit: '套', qty: 1, color: '#c0c0c5', accent: '#aaaaaf', pat: 'chrome' },
+          { id: 'bt1s2', name: '黑色暗装花洒', brand: '科勒', model: 'K-77982T', price: 12800, unit: '套', qty: 1, color: '#3a3a3a', accent: '#2a2a2a', pat: 'black' },
+          { id: 'bt1s3', name: '钢琴键花洒系统', brand: '摩恩', model: 'PK-600', price: 6800, unit: '套', qty: 1, color: '#e0e0e2', accent: '#d0d0d2', pat: 'piano' },
+        ]
+      },
     ],
     defaults: { floor: 'bt1f1', wall: 'bt1w1', vanity: 'bt1v1', toilet: 'bt1t1', shower: 'bt1s1' },
   },
@@ -139,31 +169,41 @@ const ROOM_DATA: Record<string, RoomDef> = {
     name: '二楼主卧', label: '二楼主卧',
     pano: '/yuanyang/master2f.jpg',
     categories: [
-      { id: 'floor', name: '地面', icon: '◫', options: [
-        { id: 'm2f1', name: '胡桃木地板', brand: '大自然', model: 'HT-W01', price: 458, unit: '㎡', qty: 25, color: '#8b7355', accent: '#7a6348', pat: 'wood' },
-        { id: 'm2f2', name: '奶油色橡木地板', brand: '圣象', model: 'NK1008', price: 388, unit: '㎡', qty: 25, color: '#d4c5a9', accent: '#c4b595', pat: 'wood' },
-        { id: 'm2f3', name: '人字拼地板', brand: '圣象', model: 'SF-H03', price: 488, unit: '㎡', qty: 25, color: '#b89968', accent: '#a88858', pat: 'herringbone' },
-      ]},
-      { id: 'wall', name: '墙面', icon: '▦', options: [
-        { id: 'm2w1', name: '暖白乳胶漆', brand: '多乐士', model: 'N991', price: 65, unit: '㎡', qty: 65, color: '#f8f4ef', accent: '#f8f4ef', pat: 'solid' },
-        { id: 'm2w2', name: '莫兰迪粉', brand: '本杰明摩尔', model: 'HC-63', price: 88, unit: '㎡', qty: 65, color: '#e0cfc5', accent: '#d4c3b8', pat: 'solid' },
-        { id: 'm2w3', name: '浅咖织物墙布', brand: '玉兰', model: 'WB-208', price: 180, unit: '㎡', qty: 65, color: '#c8b8a5', accent: '#baa892', pat: 'fabric' },
-      ]},
-      { id: 'bedwall', name: '床头背景', icon: '▣', options: [
-        { id: 'm2bw1', name: '皮革软包', brand: 'CBD', model: 'BP-01', price: 8800, unit: '套', qty: 1, color: '#a08870', accent: '#8a7560', pat: 'leather' },
-        { id: 'm2bw2', name: '木饰面+灯带', brand: '科定', model: 'KD-B05', price: 10200, unit: '套', qty: 1, color: '#8b7355', accent: '#fff8e7', pat: 'woodlight' },
-        { id: 'm2bw3', name: '极简乳胶漆', brand: '多乐士', model: 'S991', price: 3200, unit: '套', qty: 1, color: '#e8e2dc', accent: '#ddd7d0', pat: 'minimal' },
-      ]},
-      { id: 'bed', name: '床', icon: '▭', options: [
-        { id: 'm2bd1', name: '布艺软床 1.8m', brand: 'CBD', model: 'D028', price: 12800, unit: '套', qty: 1, color: '#c8bfb5', accent: '#b8afa5', pat: 'fabric' },
-        { id: 'm2bd2', name: '真皮软床 1.8m', brand: '慕思', model: 'V6-T226', price: 18600, unit: '套', qty: 1, color: '#8a7a6a', accent: '#7a6a5a', pat: 'leather' },
-        { id: 'm2bd3', name: '实木框架床 1.8m', brand: '源氏木语', model: 'Y8602', price: 8800, unit: '套', qty: 1, color: '#a08060', accent: '#c4a97d', pat: 'woodframe' },
-      ]},
-      { id: 'wardrobe', name: '衣柜', icon: '⊞', options: [
-        { id: 'm2wr1', name: '白色极简平开门', brand: '索菲亚', model: 'WR-W01', price: 18800, unit: '套', qty: 1, color: '#f0ece6', accent: '#e8e4de', pat: 'white' },
-        { id: 'm2wr2', name: '木纹推拉门', brand: '欧派', model: 'WR-M02', price: 15200, unit: '套', qty: 1, color: '#a08060', accent: '#8b7050', pat: 'woodslide' },
-        { id: 'm2wr3', name: '玻璃+金属框', brand: '好莱客', model: 'WR-G03', price: 22800, unit: '套', qty: 1, color: '#d8d4d0', accent: '#888', pat: 'glass' },
-      ]},
+      {
+        id: 'floor', name: '地面', icon: '◫', options: [
+          { id: 'm2f1', name: '胡桃木地板', brand: '大自然', model: 'HT-W01', price: 458, unit: '㎡', qty: 25, color: '#8b7355', accent: '#7a6348', pat: 'wood' },
+          { id: 'm2f2', name: '奶油色橡木地板', brand: '圣象', model: 'NK1008', price: 388, unit: '㎡', qty: 25, color: '#d4c5a9', accent: '#c4b595', pat: 'wood' },
+          { id: 'm2f3', name: '人字拼地板', brand: '圣象', model: 'SF-H03', price: 488, unit: '㎡', qty: 25, color: '#b89968', accent: '#a88858', pat: 'herringbone' },
+        ]
+      },
+      {
+        id: 'wall', name: '墙面', icon: '▦', options: [
+          { id: 'm2w1', name: '暖白乳胶漆', brand: '多乐士', model: 'N991', price: 65, unit: '㎡', qty: 65, color: '#f8f4ef', accent: '#f8f4ef', pat: 'solid' },
+          { id: 'm2w2', name: '莫兰迪粉', brand: '本杰明摩尔', model: 'HC-63', price: 88, unit: '㎡', qty: 65, color: '#e0cfc5', accent: '#d4c3b8', pat: 'solid' },
+          { id: 'm2w3', name: '浅咖织物墙布', brand: '玉兰', model: 'WB-208', price: 180, unit: '㎡', qty: 65, color: '#c8b8a5', accent: '#baa892', pat: 'fabric' },
+        ]
+      },
+      {
+        id: 'bedwall', name: '床头背景', icon: '▣', options: [
+          { id: 'm2bw1', name: '皮革软包', brand: 'CBD', model: 'BP-01', price: 8800, unit: '套', qty: 1, color: '#a08870', accent: '#8a7560', pat: 'leather' },
+          { id: 'm2bw2', name: '木饰面+灯带', brand: '科定', model: 'KD-B05', price: 10200, unit: '套', qty: 1, color: '#8b7355', accent: '#fff8e7', pat: 'woodlight' },
+          { id: 'm2bw3', name: '极简乳胶漆', brand: '多乐士', model: 'S991', price: 3200, unit: '套', qty: 1, color: '#e8e2dc', accent: '#ddd7d0', pat: 'minimal' },
+        ]
+      },
+      {
+        id: 'bed', name: '床', icon: '▭', options: [
+          { id: 'm2bd1', name: '布艺软床 1.8m', brand: 'CBD', model: 'D028', price: 12800, unit: '套', qty: 1, color: '#c8bfb5', accent: '#b8afa5', pat: 'fabric' },
+          { id: 'm2bd2', name: '真皮软床 1.8m', brand: '慕思', model: 'V6-T226', price: 18600, unit: '套', qty: 1, color: '#8a7a6a', accent: '#7a6a5a', pat: 'leather' },
+          { id: 'm2bd3', name: '实木框架床 1.8m', brand: '源氏木语', model: 'Y8602', price: 8800, unit: '套', qty: 1, color: '#a08060', accent: '#c4a97d', pat: 'woodframe' },
+        ]
+      },
+      {
+        id: 'wardrobe', name: '衣柜', icon: '⊞', options: [
+          { id: 'm2wr1', name: '白色极简平开门', brand: '索菲亚', model: 'WR-W01', price: 18800, unit: '套', qty: 1, color: '#f0ece6', accent: '#e8e4de', pat: 'white' },
+          { id: 'm2wr2', name: '木纹推拉门', brand: '欧派', model: 'WR-M02', price: 15200, unit: '套', qty: 1, color: '#a08060', accent: '#8b7050', pat: 'woodslide' },
+          { id: 'm2wr3', name: '玻璃+金属框', brand: '好莱客', model: 'WR-G03', price: 22800, unit: '套', qty: 1, color: '#d8d4d0', accent: '#888', pat: 'glass' },
+        ]
+      },
     ],
     defaults: { floor: 'm2f1', wall: 'm2w1', bedwall: 'm2bw1', bed: 'm2bd1', wardrobe: 'm2wr1' },
   },
@@ -171,31 +211,41 @@ const ROOM_DATA: Record<string, RoomDef> = {
     name: '二楼主卫', label: '二楼主卫',
     pano: '/yuanyang/bath2f.jpg',
     categories: [
-      { id: 'floor', name: '地砖', icon: '◫', options: [
-        { id: 'bt2f1', name: '防滑深灰砖', brand: '诺贝尔', model: 'BF-D01', price: 248, unit: '㎡', qty: 7, color: '#7a7570', accent: '#6a6560', pat: 'tile' },
-        { id: 'bt2f2', name: '木纹防滑砖', brand: '马可波罗', model: 'BF-W02', price: 288, unit: '㎡', qty: 7, color: '#a89880', accent: '#988870', pat: 'wood' },
-        { id: 'bt2f3', name: '水磨石砖', brand: '蒙娜丽莎', model: 'BF-T03', price: 328, unit: '㎡', qty: 7, color: '#c8c2ba', accent: '#b8b2aa', pat: 'terrazzo' },
-      ]},
-      { id: 'wall', name: '墙砖', icon: '▦', options: [
-        { id: 'bt2w1', name: '白色亮面砖', brand: '东鹏', model: 'BW-W01', price: 168, unit: '㎡', qty: 24, color: '#f0ece8', accent: '#e8e4e0', pat: 'glossy' },
-        { id: 'bt2w2', name: '浅灰哑光砖', brand: '诺贝尔', model: 'BW-G02', price: 198, unit: '㎡', qty: 24, color: '#c8c4c0', accent: '#bab6b2', pat: 'matte' },
-        { id: 'bt2w3', name: '奶油色微水泥', brand: '磐多魔', model: 'BW-C03', price: 380, unit: '㎡', qty: 24, color: '#ddd5ca', accent: '#cec6ba', pat: 'concrete' },
-      ]},
-      { id: 'vanity', name: '浴室柜', icon: '▤', options: [
-        { id: 'bt2v1', name: '白色悬挂式 100cm', brand: 'TOTO', model: 'LDSW801', price: 12800, unit: '套', qty: 1, color: '#f0ece6', accent: '#e5e0da', pat: 'white' },
-        { id: 'bt2v2', name: '木纹落地式 120cm', brand: '箭牌', model: 'AE2509', price: 8200, unit: '套', qty: 1, color: '#a08060', accent: '#8b7050', pat: 'wood' },
-        { id: 'bt2v3', name: '岩板一体盆 100cm', brand: '恒洁', model: 'HBM-901', price: 15800, unit: '套', qty: 1, color: '#8a8580', accent: '#7a7570', pat: 'sintered' },
-      ]},
-      { id: 'toilet', name: '马桶', icon: '◯', options: [
-        { id: 'bt2t1', name: '智能马桶一体机', brand: 'TOTO', model: 'CES99', price: 16800, unit: '台', qty: 1, color: '#f5f2ef', accent: '#eae7e2', pat: 'smart' },
-        { id: 'bt2t2', name: '壁挂式马桶', brand: '杜拉维特', model: 'ME-252009', price: 12600, unit: '台', qty: 1, color: '#f0ede8', accent: '#e5e2dc', pat: 'wallhung' },
-        { id: 'bt2t3', name: '普通连体马桶', brand: '科勒', model: 'K-5171T', price: 4800, unit: '台', qty: 1, color: '#f2efea', accent: '#e8e5e0', pat: 'standard' },
-      ]},
-      { id: 'shower', name: '淋浴', icon: '⊕', options: [
-        { id: 'bt2s1', name: '恒温花洒套装', brand: '汉斯格雅', model: 'RD-S240', price: 8800, unit: '套', qty: 1, color: '#c0c0c5', accent: '#aaaaaf', pat: 'chrome' },
-        { id: 'bt2s2', name: '黑色暗装花洒', brand: '科勒', model: 'K-77982T', price: 12800, unit: '套', qty: 1, color: '#3a3a3a', accent: '#2a2a2a', pat: 'black' },
-        { id: 'bt2s3', name: '钢琴键花洒系统', brand: '摩恩', model: 'PK-600', price: 6800, unit: '套', qty: 1, color: '#e0e0e2', accent: '#d0d0d2', pat: 'piano' },
-      ]},
+      {
+        id: 'floor', name: '地砖', icon: '◫', options: [
+          { id: 'bt2f1', name: '防滑深灰砖', brand: '诺贝尔', model: 'BF-D01', price: 248, unit: '㎡', qty: 7, color: '#7a7570', accent: '#6a6560', pat: 'tile' },
+          { id: 'bt2f2', name: '木纹防滑砖', brand: '马可波罗', model: 'BF-W02', price: 288, unit: '㎡', qty: 7, color: '#a89880', accent: '#988870', pat: 'wood' },
+          { id: 'bt2f3', name: '水磨石砖', brand: '蒙娜丽莎', model: 'BF-T03', price: 328, unit: '㎡', qty: 7, color: '#c8c2ba', accent: '#b8b2aa', pat: 'terrazzo' },
+        ]
+      },
+      {
+        id: 'wall', name: '墙砖', icon: '▦', options: [
+          { id: 'bt2w1', name: '白色亮面砖', brand: '东鹏', model: 'BW-W01', price: 168, unit: '㎡', qty: 24, color: '#f0ece8', accent: '#e8e4e0', pat: 'glossy' },
+          { id: 'bt2w2', name: '浅灰哑光砖', brand: '诺贝尔', model: 'BW-G02', price: 198, unit: '㎡', qty: 24, color: '#c8c4c0', accent: '#bab6b2', pat: 'matte' },
+          { id: 'bt2w3', name: '奶油色微水泥', brand: '磐多魔', model: 'BW-C03', price: 380, unit: '㎡', qty: 24, color: '#ddd5ca', accent: '#cec6ba', pat: 'concrete' },
+        ]
+      },
+      {
+        id: 'vanity', name: '浴室柜', icon: '▤', options: [
+          { id: 'bt2v1', name: '白色悬挂式 100cm', brand: 'TOTO', model: 'LDSW801', price: 12800, unit: '套', qty: 1, color: '#f0ece6', accent: '#e5e0da', pat: 'white' },
+          { id: 'bt2v2', name: '木纹落地式 120cm', brand: '箭牌', model: 'AE2509', price: 8200, unit: '套', qty: 1, color: '#a08060', accent: '#8b7050', pat: 'wood' },
+          { id: 'bt2v3', name: '岩板一体盆 100cm', brand: '恒洁', model: 'HBM-901', price: 15800, unit: '套', qty: 1, color: '#8a8580', accent: '#7a7570', pat: 'sintered' },
+        ]
+      },
+      {
+        id: 'toilet', name: '马桶', icon: '◯', options: [
+          { id: 'bt2t1', name: '智能马桶一体机', brand: 'TOTO', model: 'CES99', price: 16800, unit: '台', qty: 1, color: '#f5f2ef', accent: '#eae7e2', pat: 'smart' },
+          { id: 'bt2t2', name: '壁挂式马桶', brand: '杜拉维特', model: 'ME-252009', price: 12600, unit: '台', qty: 1, color: '#f0ede8', accent: '#e5e2dc', pat: 'wallhung' },
+          { id: 'bt2t3', name: '普通连体马桶', brand: '科勒', model: 'K-5171T', price: 4800, unit: '台', qty: 1, color: '#f2efea', accent: '#e8e5e0', pat: 'standard' },
+        ]
+      },
+      {
+        id: 'shower', name: '淋浴', icon: '⊕', options: [
+          { id: 'bt2s1', name: '恒温花洒套装', brand: '汉斯格雅', model: 'RD-S240', price: 8800, unit: '套', qty: 1, color: '#c0c0c5', accent: '#aaaaaf', pat: 'chrome' },
+          { id: 'bt2s2', name: '黑色暗装花洒', brand: '科勒', model: 'K-77982T', price: 12800, unit: '套', qty: 1, color: '#3a3a3a', accent: '#2a2a2a', pat: 'black' },
+          { id: 'bt2s3', name: '钢琴键花洒系统', brand: '摩恩', model: 'PK-600', price: 6800, unit: '套', qty: 1, color: '#e0e0e2', accent: '#d0d0d2', pat: 'piano' },
+        ]
+      },
     ],
     defaults: { floor: 'bt2f1', wall: 'bt2w1', vanity: 'bt2v1', toilet: 'bt2t1', shower: 'bt2s1' },
   },
@@ -228,91 +278,109 @@ interface PanoViewerProps {
 
 function PanoViewer({ panoUrl, onLoadStart, onLoadEnd }: PanoViewerProps) {
   const mountRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const sphereRef = useRef<THREE.Mesh | null>(null);
-  const rafRef = useRef<number>(0);
-  const isDragging = useRef(false);
-  const prevMouse = useRef({ x: 0, y: 0 });
-  const velocity = useRef({ x: 0, y: 0 });
-  const rotation = useRef({ lon: 0, lat: 0 });
-  const targetFov = useRef(75);
-  const initDone = useRef(false);
-  const loaderRef = useRef<THREE.TextureLoader | null>(null);
+  const threeRef = useRef<{
+    renderer: THREE.WebGLRenderer;
+    scene: THREE.Scene;
+    camera: THREE.PerspectiveCamera;
+    sphere: THREE.Mesh;
+    loader: THREE.TextureLoader;
+    geometry: THREE.SphereGeometry;
+    material: THREE.MeshBasicMaterial;
+  } | null>(null);
+  const rafRef = useRef(0);
+  const drag = useRef({ active: false, px: 0, py: 0, vx: 0, vy: 0, lon: 0, lat: 0, fov: 75 });
 
-  const initScene = useCallback(() => {
-    if (!mountRef.current || initDone.current) return;
-    initDone.current = true;
+  // Scene init (runs once, no texture loading here)
+  useEffect(() => {
     const container = mountRef.current;
-    const w = container.clientWidth;
-    const h = container.clientHeight;
+    if (!container) return;
+
+    const w = container.clientWidth || window.innerWidth;
+    const h = container.clientHeight || window.innerHeight;
 
     const scene = new THREE.Scene();
-    sceneRef.current = scene;
-
     const camera = new THREE.PerspectiveCamera(75, w / h, 0.1, 1100);
     camera.position.set(0, 0, 0);
-    cameraRef.current = camera;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(w, h);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
 
-    // Create sphere for equirectangular projection
     const geometry = new THREE.SphereGeometry(500, 64, 32);
-    geometry.scale(-1, 1, 1); // Render inside
-
-    const material = new THREE.MeshBasicMaterial({ color: 0x111111 });
+    geometry.scale(-1, 1, 1);
+    const material = new THREE.MeshBasicMaterial({ color: 0x222222 });
     const sphere = new THREE.Mesh(geometry, material);
     scene.add(sphere);
-    sphereRef.current = sphere;
 
-    loaderRef.current = new THREE.TextureLoader();
+    const loader = new THREE.TextureLoader();
+    threeRef.current = { renderer, scene, camera, sphere, loader, geometry, material };
 
-    // Load initial panorama
-    loadPanorama(panoUrl);
-
-    // Animation loop
+    const d = drag.current;
     const animate = () => {
       rafRef.current = requestAnimationFrame(animate);
-      if (!isDragging.current) {
-        velocity.current.x *= 0.95;
-        velocity.current.y *= 0.95;
-        rotation.current.lon += velocity.current.x;
-        rotation.current.lat += velocity.current.y;
+
+      if (!d.active) {
+        d.vx *= 0.95;
+        d.vy *= 0.95;
+        d.lon += d.vx;
+        d.lat += d.vy;
       }
-      // Auto-rotate when idle
-      if (!isDragging.current && Math.abs(velocity.current.x) < 0.01 && Math.abs(velocity.current.y) < 0.01) {
-        rotation.current.lon += 0.015;
+      if (!d.active && Math.abs(d.vx) < 0.01 && Math.abs(d.vy) < 0.01) {
+        d.lon += 0.015;
       }
-      rotation.current.lat = Math.max(-85, Math.min(85, rotation.current.lat));
-      camera.fov += (targetFov.current - camera.fov) * 0.1;
+      d.lat = Math.max(-85, Math.min(85, d.lat));
+
+      camera.fov += (d.fov - camera.fov) * 0.1;
       camera.updateProjectionMatrix();
 
-      const phi = THREE.MathUtils.degToRad(90 - rotation.current.lat);
-      const theta = THREE.MathUtils.degToRad(rotation.current.lon);
-      const target = new THREE.Vector3(
+      const phi = THREE.MathUtils.degToRad(90 - d.lat);
+      const theta = THREE.MathUtils.degToRad(d.lon);
+      camera.lookAt(new THREE.Vector3(
         500 * Math.sin(phi) * Math.cos(theta),
         500 * Math.cos(phi),
-        500 * Math.sin(phi) * Math.sin(theta)
-      );
-      camera.lookAt(target);
+        500 * Math.sin(phi) * Math.sin(theta),
+      ));
       renderer.render(scene, camera);
     };
     animate();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadPanorama = useCallback((url: string) => {
-    if (!loaderRef.current || !sphereRef.current) return;
+    // Resize handler
+    const onResize = () => {
+      if (!container) return;
+      const cw = container.clientWidth, ch = container.clientHeight;
+      camera.aspect = cw / ch;
+      camera.updateProjectionMatrix();
+      renderer.setSize(cw, ch);
+    };
+    window.addEventListener('resize', onResize);
+
+    return () => {
+      window.removeEventListener('resize', onResize);
+      cancelAnimationFrame(rafRef.current);
+      container.removeChild(renderer.domElement);
+      renderer.dispose();
+      geometry.dispose();
+      material.dispose();
+      threeRef.current = null;
+    };
+  }, []);
+
+  // Load / switch panorama texture
+  useEffect(() => {
+    const three = threeRef.current;
+    if (!three) return;
+
     onLoadStart?.();
-    loaderRef.current.load(
-      url,
+    three.loader.load(
+      panoUrl,
       (texture) => {
+        if (!threeRef.current) return; // unmounted
         texture.colorSpace = THREE.SRGBColorSpace;
-        const mat = sphereRef.current!.material as THREE.MeshBasicMaterial;
+        texture.minFilter = THREE.LinearFilter;
+        texture.generateMipmaps = false;
+        const mat = threeRef.current.material;
         if (mat.map) mat.map.dispose();
         mat.map = texture;
         mat.color.set(0xffffff);
@@ -320,73 +388,39 @@ function PanoViewer({ panoUrl, onLoadStart, onLoadEnd }: PanoViewerProps) {
         onLoadEnd?.();
       },
       undefined,
-      () => {
+      (err) => {
+        console.error('[PanoViewer] texture load failed:', panoUrl, err);
         onLoadEnd?.();
-      }
+      },
     );
-  }, [onLoadStart, onLoadEnd]);
-
-  // Switch panorama when panoUrl changes
-  useEffect(() => {
-    if (initDone.current && loaderRef.current && sphereRef.current) {
-      loadPanorama(panoUrl);
-    }
-  }, [panoUrl, loadPanorama]);
-
-  // Init
-  useEffect(() => {
-    initScene();
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      if (rendererRef.current && mountRef.current) {
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        mountRef.current.removeChild(rendererRef.current.domElement);
-        rendererRef.current.dispose();
-      }
-      initDone.current = false;
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Resize
-  useEffect(() => {
-    const onResize = () => {
-      if (!mountRef.current || !cameraRef.current || !rendererRef.current) return;
-      const w = mountRef.current.clientWidth, h = mountRef.current.clientHeight;
-      cameraRef.current.aspect = w / h;
-      cameraRef.current.updateProjectionMatrix();
-      rendererRef.current.setSize(w, h);
-    };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panoUrl]);
 
   // Pointer events
   const onPointerDown = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    isDragging.current = true;
-    velocity.current = { x: 0, y: 0 };
+    const d = drag.current;
+    d.active = true; d.vx = 0; d.vy = 0;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    prevMouse.current = { x: clientX, y: clientY };
+    d.px = clientX; d.py = clientY;
   }, []);
 
   const onPointerMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDragging.current) return;
+    const d = drag.current;
+    if (!d.active) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const dx = (clientX - prevMouse.current.x) * 0.15;
-    const dy = (clientY - prevMouse.current.y) * 0.15;
-    rotation.current.lon -= dx;
-    rotation.current.lat += dy;
-    velocity.current = { x: -dx, y: dy };
-    prevMouse.current = { x: clientX, y: clientY };
+    const dx = (clientX - d.px) * 0.15;
+    const dy = (clientY - d.py) * 0.15;
+    d.lon -= dx; d.lat += dy;
+    d.vx = -dx; d.vy = dy;
+    d.px = clientX; d.py = clientY;
   }, []);
 
-  const onPointerUp = useCallback(() => {
-    isDragging.current = false;
-  }, []);
+  const onPointerUp = useCallback(() => { drag.current.active = false; }, []);
 
   const onWheel = useCallback((e: React.WheelEvent) => {
-    targetFov.current = Math.max(30, Math.min(100, targetFov.current + e.deltaY * 0.05));
+    drag.current.fov = Math.max(30, Math.min(100, drag.current.fov + e.deltaY * 0.05));
   }, []);
 
   return (
