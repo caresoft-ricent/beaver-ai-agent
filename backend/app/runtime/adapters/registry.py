@@ -26,8 +26,9 @@ class AdapterRegistry:
 def build_default_registry() -> AdapterRegistry:
     """构建默认的 AdapterRegistry，注册所有内置 Adapter"""
     from app.runtime.adapters.webapi_adapter import WebApiAdapter
+    from app.runtime.adapters.database_adapter import DatabaseAdapter
 
     registry = AdapterRegistry()
     registry.register("webapi", WebApiAdapter())
-    # 未来: registry.register("database", DatabaseAdapter())
+    registry.register("database", DatabaseAdapter())
     return registry
