@@ -43,6 +43,10 @@ class Action(Base):
     risk_level = Column(String(16), default="low", comment="风险等级: low/medium/high")
     generated_by = Column(String(16), default="manual", comment="数据来源: manual/llm/api_sync")
     discovery_status = Column(String(16), default="published", comment="审核状态: draft/reviewed/published")
+    # 2.0 新增
+    domain_id = Column(BigInteger, comment="所属 Domain（冗余，方便查询）")
+    evidence_schema = Column(JSON, comment="证据项定义")
+    response_type = Column(String(16), default="text", comment="默认输出形式: text/table/card/confirm/mixed")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -69,5 +73,11 @@ class ActionParameter(Base):
     enum_values = Column(JSON, comment="枚举值")
     semantic_role = Column(String(16), comment="语义角色: identifier/status/scope/timestamp/metric/label/content")
     generated_by = Column(String(16), default="manual", comment="数据来源: manual/llm")
+    # 2.0 映射字段
+    filter_type = Column(String(50), comment="河狸云 filterType: String/Integer/Long/Decimal/Boolean/Date/Time/DateTime/set")
+    filter_condition = Column(String(50), comment="河狸云条件类型: equals/contains/greaterThan/lessThan/inRange 等")
+    value_mode = Column(String(20), default="filter", comment="值传递模式: filter/values/range/date_range")
+    agg_func = Column(String(50), comment="聚合函数: sum/count/distinctCount/avg/max/min/first/last/percent/formula")
+    sort_order = Column(String(4), comment="排序方式: asc/desc")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

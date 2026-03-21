@@ -8,3 +8,4 @@ from app.models.chat import ChatSession, ChatMessage, ActionLog  # noqa
 from app.models.admin import AdminUser, OperationLog  # noqa
 from app.models.normalization import NormalizationRule  # noqa
 from app.models.execution_log import ExecutionLog  # noqa
+from app.models.domain import Domain  # noqa

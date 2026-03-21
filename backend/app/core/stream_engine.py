@@ -36,6 +36,10 @@ from app.kernel.scope import BeaverSessionScope
 from app.kernel.capability import CapabilityRegistry
 from app.kernel.policy import PolicyGuard
 from app.models.execution_log import ExecutionLog
+from app.runtime.domain_runtime import DomainRuntime
+from app.runtime.context_planner import ContextPlanner
+from app.runtime.action_runtime import ActionRuntime
+from app.runtime.response_runtime import ResponseRuntime
 
 logger = logging.getLogger("beaver.engine")
 
@@ -197,7 +201,140 @@ async def _stream_dialog_inner(
     history_intents.append(matched_skill.skill_code)
     ctx["history_intents"] = history_intents[-10:]
 
-    # -- Step 4: 增强实体抽取 --
+    # -- Step 3.5: Domain 双轨路由 --
+    # 如果匹配到的技能关联了 Domain，走新 Runtime 路径
+    domain_runtime = DomainRuntime(db, tenant_id)
+    domain_code = domain_runtime.resolve_domain(message, ctx)
+    if domain_code:
+        try:
+            pack = domain_runtime.load_domain_pack(domain_code)
+        except Exception:
+            pack = None
+
+        if pack:
+            evidence.add_step("domain_route", {
+                "domain_code": domain_code,
+                "domain_name": pack.domain.name,
+                "action_codes": pack.all_action_codes(),
+                "route": "domain_runtime",
+            })
+
+            # --- Domain 路径: 实体抽取 + Planner + ActionRuntime ---
+            yield agui.step_started("entity_extraction")
+            t0 = time.time()
+
+            # 合并实体 (规则抽取 + 上下文)
+            entities = merge_entities(ctx.get("entities", {}), rule_entities)
+
+            # LLM 增强抽取
+            llm_result = _enhanced_entity_extraction(
+                db, tenant_id, message, matched_skill, entities, ctx
+            )
+            llm_ents = llm_result.get("entities", {}) if isinstance(llm_result, dict) else {}
+            if llm_ents:
+                entities = merge_entities(entities, llm_ents)
+
+            ctx["entities"] = entities
+            save_context(db, session_id, ctx)
+
+            evidence.add_step("entity_extraction", {
+                "entities": entities,
+                "route": "domain_runtime",
+            }, int((time.time() - t0) * 1000))
+            yield agui.step_finished("entity_extraction")
+
+            # 规划
+            planner = ContextPlanner(db, tenant_id)
+            plan = planner.plan(
+                pack=pack,
+                entities=entities,
+                message=message,
+                intent_code=matched_skill.skill_code,
+                skill=matched_skill,
+            )
+
+            evidence.add_step("context_plan", {
+                "plan_type": plan.plan_type,
+                "action_code": plan.action_code,
+                "param_gaps": [g["name"] for g in plan.param_gaps],
+            })
+
+            # 追问 / 确认 / 兜底
+            if plan.plan_type == "clarify":
+                yield agui.custom_event("clarification", {
+                    "missing_params": plan.param_gaps,
+                    "text": plan.clarification_text,
+                })
+                async for evt in _stream_text(plan.clarification_text):
+                    yield evt
+                save_context(db, session_id, ctx)
+                return
+
+            if plan.plan_type == "confirm":
+                resp_rt = ResponseRuntime()
+                for evt in resp_rt.compose(plan):
+                    yield evt
+                confirm_text = "请确认以上信息是否正确。"
+                async for evt in _stream_text(confirm_text):
+                    yield evt
+                save_context(db, session_id, ctx)
+                return
+
+            if plan.plan_type == "fallback":
+                async for evt in _stream_text(plan.clarification_text or "抱歉，暂时无法处理此请求。"):
+                    yield evt
+                return
+
+            # 执行
+            yield agui.step_started("tool_execution")
+            t0 = time.time()
+
+            action_rt = ActionRuntime(db, tenant_id)
+            action_result = await action_rt.execute(
+                pack=pack,
+                action_code=plan.action_code,
+                flat_params=plan.flat_params,
+                session_headers=session_headers,
+            )
+
+            evidence.add_step("action_execution", action_result.evidence,
+                              int((time.time() - t0) * 1000))
+            yield agui.step_finished("tool_execution")
+
+            # 响应组装
+            yield agui.step_started("reply_generation")
+            resp_rt = ResponseRuntime()
+            for evt in resp_rt.compose(plan, action_result):
+                yield evt
+
+            if action_result.success and action_result.data:
+                # LLM 回复
+                llm_config = _get_llm_config(db, tenant_id, "response")
+                if llm_config:
+                    query_results = {"domain_result": action_result.data}
+                    async for evt in _stream_llm_reply(
+                        llm_config, message, matched_skill, query_results
+                    ):
+                        yield evt
+                else:
+                    async for evt in _stream_text(
+                        _format_data_as_text({"domain_result": action_result.data})
+                    ):
+                        yield evt
+            elif not action_result.success:
+                async for evt in _stream_text(
+                    f"操作执行失败: {action_result.error or '未知错误'}"
+                ):
+                    yield evt
+            else:
+                async for evt in _stream_text("查询到的信息为空，请确认您的问题或稍后再试。"):
+                    yield evt
+
+            yield agui.step_finished("reply_generation")
+            yield agui.custom_event("evidence", evidence.to_dict())
+            return
+
+    # -- Step 4: 增强实体抽取 (旧路径) --
     yield agui.step_started("entity_extraction")
     t0 = time.time()
 

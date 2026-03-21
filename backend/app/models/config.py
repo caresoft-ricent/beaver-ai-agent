@@ -47,5 +47,8 @@ class Connector(Base):
     adapter_type = Column(String(16), default="webapi", comment="适配器类型: webapi/database")
     db_config = Column(JSON, comment="数据库配置（WebAPI类不需要）")
     openapi_url = Column(String(500), comment="OpenAPI文档地址（远期）")
+    # 2.0 映射器
+    request_mapper = Column(String(100), default="passthrough", comment="请求映射器: passthrough/beaver_dataset")
+    response_mapper = Column(String(100), default="passthrough", comment="响应映射器: passthrough/beaver_dataset")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

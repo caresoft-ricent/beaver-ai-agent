@@ -47,6 +47,8 @@ class Entity(Base):
     generated_by = Column(String(16), default="manual", comment="数据来源: manual/llm/api_sync/domain_auto")
     confidence = Column(Numeric(3, 2), default=1.00, comment="可信度")
     discovery_status = Column(String(16), default="published", comment="审核状态: draft/reviewed/published")
+    # 2.0 新增
+    domain_id = Column(BigInteger, index=True, comment="所属 Domain")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

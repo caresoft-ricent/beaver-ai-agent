@@ -27,4 +27,9 @@ class ExecutionLog(Base):
     success = Column(Boolean, comment="是否成功")
     error_message = Column(Text, comment="错误信息")
     duration_ms = Column(Integer, comment="执行耗时(毫秒)")
+    # 2.0 新增
+    domain_id = Column(BigInteger, index=True, comment="命中的 Domain")
+    param_gaps = Column(JSON, comment="参数缺口（自发现用）")
+    fallback_reason = Column(String(500), comment="fallback 原因")
+    confirm_status = Column(String(16), default="not_needed", comment="确认状态: not_needed/pending/confirmed/cancelled")
     created_at = Column(DateTime, server_default=func.now())
