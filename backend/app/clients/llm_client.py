@@ -42,10 +42,20 @@ def call_llm(
     if not url.endswith("/chat/completions"):
         url = url + "/chat/completions"
 
-    with httpx.Client(timeout=60) as client:
-        resp = client.post(url, headers=headers, json=payload)
-        resp.raise_for_status()
-        data = resp.json()
+    logger.debug("LLM请求 url=%s model=%s temperature=%s max_tokens=%s", url, model, temperature, max_tokens)
+    logger.debug("LLM messages(%d条):\n%s", len(messages), json.dumps(messages, ensure_ascii=False, indent=2)[:4000])
+
+    try:
+        with httpx.Client(timeout=60) as client:
+            resp = client.post(url, headers=headers, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.ConnectError as e:
+        logger.error("LLM连接失败 url=%s error=%s", url, e)
+        raise
+    except httpx.HTTPStatusError as e:
+        logger.error("LLM返回错误 status=%s body=%s", e.response.status_code, e.response.text[:500])
+        raise
 
     # 解析响应(OpenAI兼容格式)
     choice = data.get("choices", [{}])[0]
@@ -54,6 +64,7 @@ def call_llm(
 
     logger.info("LLM调用 model=%s tokens=%s finish=%s",
                 model, usage.get("total_tokens", 0), choice.get("finish_reason", ""))
+    logger.debug("LLM响应内容:\n%s", message.get("content", "")[:2000])
 
     return {
         "content": message.get("content", ""),

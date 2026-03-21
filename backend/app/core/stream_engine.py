@@ -205,6 +205,7 @@ async def _stream_dialog_inner(
     # 如果匹配到的技能关联了 Domain，走新 Runtime 路径
     domain_runtime = DomainRuntime(db, tenant_id)
     domain_code = domain_runtime.resolve_domain(message, ctx)
+    logger.debug("── Domain路由: resolve_domain=%s", domain_code)
     if domain_code:
         try:
             pack = domain_runtime.load_domain_pack(domain_code)
@@ -253,6 +254,10 @@ async def _stream_dialog_inner(
                 skill=matched_skill,
             )
 
+            logger.debug("── Planner结果: type=%s action=%s gaps=%s",
+                         plan.plan_type, plan.action_code,
+                         [g["name"] for g in plan.param_gaps])
+
             evidence.add_step("context_plan", {
                 "plan_type": plan.plan_type,
                 "action_code": plan.action_code,
@@ -295,6 +300,8 @@ async def _stream_dialog_inner(
                 action_code=plan.action_code,
                 flat_params=plan.flat_params,
                 session_headers=session_headers,
+                session_id=session_id,
+                user_input=message,
             )
 
             evidence.add_step("action_execution", action_result.evidence,

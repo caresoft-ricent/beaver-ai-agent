@@ -50,6 +50,8 @@ class ActionRuntime:
         action_code: str,
         flat_params: dict,
         session_headers: dict = None,
+        session_id: str = None,
+        user_input: str = None,
     ) -> ActionResult:
         """执行单个 Action
 
@@ -124,7 +126,8 @@ class ActionRuntime:
             evidence["error"] = result.error
 
         # 8. 记录日志
-        self._log(action, connector, flat_params, result, duration)
+        self._log(action, connector, flat_params, result, duration,
+                 session_id=session_id, user_input=user_input)
 
         return ActionResult(
             success=result.success,
@@ -136,11 +139,12 @@ class ActionRuntime:
             evidence=evidence,
         )
 
-    def _log(self, action, connector, params, result, duration_ms):
+    def _log(self, action, connector, params, result, duration_ms, *,
+             session_id: str = None, user_input: str = None):
         """写 ExecutionLog"""
         try:
             log = ExecutionLog(
-                session_id=None,
+                session_id=session_id,
                 user_input=None,
                 action_id=action.id,
                 adapter_id=connector.id,

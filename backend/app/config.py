@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     # App
     app_env: str = "development"
     app_debug: bool = True
+    log_level: str = "INFO"
     app_port: int = 8000
 
     # Beaver Cloud WebAPI（身份验证）

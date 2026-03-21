@@ -14,14 +14,20 @@ os.environ.setdefault("TZ", "Asia/Shanghai")
 time.tzset()
 
 # 配置全链路日志: beaver.* 命名空间
+# LOG_LEVEL 环境变量 / .env 配置控制，支持 DEBUG / INFO / WARNING
+_log_level = getattr(logging, get_settings().log_level.upper(), logging.INFO)
 logging.basicConfig(
-    level=logging.INFO,
+    level=_log_level,
     format="%(asctime)s [%(name)s] %(levelname)s %(message)s",
     datefmt="%H:%M:%S",
 )
-# beaver.* 子日志器: evidence / engine / connector / llm
-for _ns in ("beaver.evidence", "beaver.engine", "beaver.connector", "beaver.llm"):
-    logging.getLogger(_ns).setLevel(logging.INFO)
+# beaver.* 子日志器统一跟随配置
+for _ns in ("beaver.evidence", "beaver.engine", "beaver.connector", "beaver.llm",
+            "beaver.runtime.domain", "beaver.runtime.planner", "beaver.runtime.action",
+            "beaver.runtime.response", "beaver.runtime.adapter", "beaver.context"):
+    logging.getLogger(_ns).setLevel(_log_level)
+if _log_level <= logging.DEBUG:
+    logging.getLogger("beaver").info("🔍 DEBUG 模式已启用 — LLM prompt/response 将完整打印")
 
 # 导入所有模型,确保 create_all 能发现
 from app.models import (  # noqa: F401

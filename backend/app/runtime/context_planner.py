@@ -141,18 +141,21 @@ class ContextPlanner:
             if exact:
                 return exact
 
-        # 按输入参数覆盖率排序
+        # 按输入参数覆盖率排序（必填参数权重 2x）
         scored = []
         for action in all_actions:
             input_defs = pack.get_input_params(action.id)
             if not input_defs:
                 scored.append((action, 0.5))
                 continue
-            covered = sum(
-                1 for p in input_defs
-                if (p.source_property or p.name) in entities or p.name in entities
-            )
-            score = covered / len(input_defs)
+            total_weight = 0
+            covered_weight = 0
+            for p in input_defs:
+                w = 2.0 if p.is_required else 1.0
+                total_weight += w
+                if (p.source_property or p.name) in entities or p.name in entities:
+                    covered_weight += w
+            score = covered_weight / total_weight if total_weight > 0 else 0
             scored.append((action, score))
 
         scored.sort(key=lambda x: x[1], reverse=True)

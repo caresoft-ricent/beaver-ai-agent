@@ -62,7 +62,8 @@ class ResponseRuntime:
         return events
 
     def _compose_fallback(self, plan: PlanResult) -> list:
-        # fallback 由 stream_engine 直接 _stream_text
+        logger.debug("兼底响应: domain 路由未找到可执行 Action, action_code=%s",
+                     plan.action_code)
         return []
 
     def _compose_execute(self, plan: PlanResult, result: ActionResult = None) -> list:
