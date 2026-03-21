@@ -48,7 +48,7 @@ interface PropertyItem {
   mapping_config?: Record<string, unknown>;
 }
 interface ActionItem { id: number; entity_id: number; tenant_id: number; connector_id?: number; action_code: string; action_name: string; action_description?: string; category?: string; http_method: string; api_path?: string; request_template?: Record<string, unknown>; response_mapping?: Record<string, unknown>; response_description?: string; cache_ttl?: number; mock_response?: Record<string, unknown>; tags?: string[]; }
-interface ActionParameterItem { id: number; action_id: number; property_id?: number; name: string; source_property?: string; type: string; title?: string; param_description?: string; is_input: boolean; is_output: boolean; is_required: boolean; default_value?: string; value_type: string; }
+interface ActionParameterItem { id: number; action_id: number; property_id?: number; name: string; source_property?: string; type: string; title?: string; param_description?: string; is_input: boolean; is_output: boolean; is_required: boolean; default_value?: string; value_type: string; filter_type?: string; filter_condition?: string; value_mode?: string; agg_func?: string; sort_order?: string; }
 
 const modeIcon: Record<string, React.ReactNode> = {
   api: <ApiOutlined />,
@@ -301,6 +301,11 @@ export default function EntityList() {
       is_required: record.is_required,
       default_value: record.default_value || '',
       value_type: record.value_type || 'none',
+      filter_type: record.filter_type || undefined,
+      filter_condition: record.filter_condition || undefined,
+      value_mode: record.value_mode || undefined,
+      agg_func: record.agg_func || undefined,
+      sort_order: record.sort_order || undefined,
     });
     setParamEditOpen(true);
   };
@@ -911,6 +916,54 @@ export default function EntityList() {
           <Form.Item name="param_description" label="参数描述">
             <Input.TextArea rows={2} placeholder="参数说明" />
           </Form.Item>
+          <Divider plain style={{ margin: '8px 0' }}>2.0 映射配置（河狸云协议）</Divider>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+            <Form.Item name="filter_type" label="filterType">
+              <Select allowClear placeholder="-" options={[
+                { value: 'String', label: 'String' },
+                { value: 'Long', label: 'Long' },
+                { value: 'Decimal', label: 'Decimal' },
+                { value: 'Date', label: 'Date' },
+                { value: 'set', label: 'set' },
+              ]} />
+            </Form.Item>
+            <Form.Item name="filter_condition" label="条件类型">
+              <Select allowClear placeholder="-" options={[
+                { value: 'equals', label: 'equals' },
+                { value: 'contains', label: 'contains' },
+                { value: 'startsWith', label: 'startsWith' },
+                { value: 'greaterThan', label: 'greaterThan' },
+                { value: 'lessThan', label: 'lessThan' },
+                { value: 'inRange', label: 'inRange' },
+              ]} />
+            </Form.Item>
+            <Form.Item name="value_mode" label="取值模式">
+              <Select allowClear placeholder="-" options={[
+                { value: 'filter', label: 'filter' },
+                { value: 'values', label: 'values' },
+                { value: 'range', label: 'range' },
+                { value: 'date_range', label: 'date_range' },
+              ]} />
+            </Form.Item>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <Form.Item name="agg_func" label="聚合函数">
+              <Select allowClear placeholder="-" options={[
+                { value: 'count', label: 'count' },
+                { value: 'sum', label: 'sum' },
+                { value: 'avg', label: 'avg' },
+                { value: 'min', label: 'min' },
+                { value: 'max', label: 'max' },
+                { value: 'percent', label: 'percent' },
+              ]} />
+            </Form.Item>
+            <Form.Item name="sort_order" label="排序">
+              <Select allowClear placeholder="-" options={[
+                { value: 'asc', label: '升序 (asc)' },
+                { value: 'desc', label: '降序 (desc)' },
+              ]} />
+            </Form.Item>
+          </div>
         </Form>
       </Modal>
     </>

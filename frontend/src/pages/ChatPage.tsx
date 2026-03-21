@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Layout, Input, Button, List, Typography, Space, Spin, Tag, Empty,
   theme, Popconfirm, message, Tooltip, Drawer, Checkbox,
@@ -93,9 +94,17 @@ const useIsMobile = () => {
   return isMobile;
 };
 
+interface SessionUserInfo {
+  session_id: string;
+  user_name?: string;
+  display_name?: string;
+  ou_name?: string;
+}
+
 export default function ChatPage({ embedMode, tenantId, customerId }: ChatPageProps = {}) {
   const { token: t } = theme.useToken();
   const isMobile = useIsMobile();
+  const [searchParams] = useSearchParams();
 
   const TENANT_ID = tenantId ?? TENANT_ID_DEFAULT;
   const CUSTOMER_ID = customerId ?? CUSTOMER_ID_DEFAULT;
@@ -113,6 +122,7 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
   const [batchMode, setBatchMode] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+  const [sessionUser, setSessionUser] = useState<SessionUserInfo | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<any>(null);
@@ -130,6 +140,26 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
   }, []);
 
   useEffect(() => { loadSessions(); }, [loadSessions]);
+
+  // Session protection: read session_id from URL and validate
+  useEffect(() => {
+    const urlSessionId = searchParams.get('session_id');
+    if (!urlSessionId) return;
+    (async () => {
+      try {
+        const res = await client.get('/session/info', { params: { session_id: urlSessionId } });
+        const info = res.data;
+        setSessionUser({
+          session_id: urlSessionId,
+          user_name: info.user_name,
+          display_name: info.display_name,
+          ou_name: info.ou_name,
+        });
+      } catch {
+        // Session invalid/expired — continue without protection
+      }
+    })();
+  }, [searchParams]);
 
   useEffect(() => {
     if (!activeSession) { setMessages([]); return; }
@@ -324,9 +354,13 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
     setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '', streaming: true }]);
 
     try {
+      const sseHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (sessionUser?.session_id) {
+        sseHeaders['X-Session-Id'] = sessionUser.session_id;
+      }
       const resp = await fetch('/api/v1/chat/stream', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: sseHeaders,
         body: JSON.stringify({
           thread_id: activeSession || undefined,
           messages: [{ role: 'user', content: text }],
@@ -536,6 +570,21 @@ export default function ChatPage({ embedMode, tenantId, customerId }: ChatPagePr
       )}
 
       <Content style={{ display: 'flex', flexDirection: 'column', background: '#f7f7f8', overflow: 'hidden' }}>
+        {/* Session user info banner */}
+        {sessionUser && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '6px 16px', background: t.colorBgContainer,
+            borderBottom: `1px solid ${t.colorBorderSecondary}`, fontSize: 13,
+          }}>
+            <UserOutlined style={{ color: t.colorPrimary }} />
+            <Text type="secondary">
+              {sessionUser.display_name || sessionUser.user_name || '用户'}
+              {sessionUser.ou_name ? ` · ${sessionUser.ou_name}` : ''}
+            </Text>
+          </div>
+        )}
+
         {/* Mobile topbar */}
         {isMobile && (
           <div style={{

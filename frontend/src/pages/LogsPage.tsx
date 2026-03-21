@@ -9,6 +9,7 @@ import {
 import { SearchOutlined, ReloadOutlined, EyeOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import client from '../api/client';
+import { getExecutionLogs, getExecutionLogDetail } from '../api/admin';
 
 const { Text, Paragraph } = Typography;
 
@@ -37,6 +38,25 @@ interface MessageLogItem {
   created_at: string;
 }
 
+interface ExecutionLogItem {
+  id: number;
+  session_id: string;
+  conversation_id: number | null;
+  user_input: string | null;
+  domain_id: number | null;
+  action_id: number | null;
+  adapter_id: number | null;
+  input_params: any;
+  output_data: any;
+  success: boolean | null;
+  error_message: string | null;
+  duration_ms: number | null;
+  param_gaps: any;
+  fallback_reason: string | null;
+  confirm_status: string;
+  created_at: string;
+}
+
 const statusColor: Record<string, string> = {
   success: 'green',
   error: 'red',
@@ -49,6 +69,7 @@ export default function LogsPage() {
   const [actionLogs, setActionLogs] = useState<ActionLogItem[]>([]);
   const [messageLogs, setMessageLogs] = useState<MessageLogItem[]>([]);
   const [errorLogs, setErrorLogs] = useState<ActionLogItem[]>([]);
+  const [execLogs, setExecLogs] = useState<ExecutionLogItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -91,6 +112,18 @@ export default function LogsPage() {
     setLoading(false);
   }, [page]);
 
+  const fetchExecLogs = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: any = { tenant_id: 1, page, size: 20 };
+      if (sessionFilter) params.session_id = sessionFilter;
+      const res = await getExecutionLogs(params);
+      setExecLogs(res.data?.data?.items ?? []);
+      setTotal(res.data?.data?.total ?? 0);
+    } catch { message.error('加载失败'); }
+    setLoading(false);
+  }, [page, sessionFilter]);
+
   useEffect(() => {
     setPage(1);
   }, [activeTab, sessionFilter, statusFilter]);
@@ -98,8 +131,9 @@ export default function LogsPage() {
   useEffect(() => {
     if (activeTab === 'action') fetchActionLogs();
     else if (activeTab === 'message') fetchMessageLogs();
+    else if (activeTab === 'execution') fetchExecLogs();
     else fetchErrorLogs();
-  }, [activeTab, fetchActionLogs, fetchMessageLogs, fetchErrorLogs]);
+  }, [activeTab, fetchActionLogs, fetchMessageLogs, fetchErrorLogs, fetchExecLogs]);
 
   const actionColumns: ColumnsType<ActionLogItem> = [
     { title: 'ID', dataIndex: 'id', width: 60 },
@@ -244,6 +278,7 @@ export default function LogsPage() {
           onClick={() => {
             if (activeTab === 'action') fetchActionLogs();
             else if (activeTab === 'message') fetchMessageLogs();
+            else if (activeTab === 'execution') fetchExecLogs();
             else fetchErrorLogs();
           }}
         >
@@ -259,6 +294,7 @@ export default function LogsPage() {
               message.success('清空成功');
               if (activeTab === 'action') fetchActionLogs();
               else if (activeTab === 'message') fetchMessageLogs();
+              else if (activeTab === 'execution') fetchExecLogs();
               else fetchErrorLogs();
             } catch { message.error('清空失败'); }
           }}
@@ -322,6 +358,66 @@ export default function LogsPage() {
                   onChange: setPage, showTotal: (t) => `共 ${t} 条`,
                 }}
                 scroll={{ x: 700 }}
+              />
+            ),
+          },
+          {
+            key: 'execution',
+            label: '执行日志 (2.0)',
+            children: (
+              <Table<ExecutionLogItem>
+                columns={[
+                  { title: 'ID', dataIndex: 'id', width: 60 },
+                  { title: '会话', dataIndex: 'session_id', width: 140, ellipsis: true },
+                  { title: '用户输入', dataIndex: 'user_input', width: 200, ellipsis: true },
+                  { title: 'Domain', dataIndex: 'domain_id', width: 80 },
+                  { title: 'Action', dataIndex: 'action_id', width: 80 },
+                  {
+                    title: '结果', dataIndex: 'success', width: 70,
+                    render: (v: boolean | null) => v === null ? <Tag>-</Tag> : v ? <Tag color="green">成功</Tag> : <Tag color="red">失败</Tag>,
+                  },
+                  { title: '耗时', dataIndex: 'duration_ms', width: 70, render: (v: number | null) => v != null ? `${v}ms` : '-' },
+                  {
+                    title: '确认', dataIndex: 'confirm_status', width: 90,
+                    render: (v: string) => {
+                      const m: Record<string, { color: string; label: string }> = {
+                        not_needed: { color: 'default', label: '无需' },
+                        pending: { color: 'orange', label: '待确认' },
+                        confirmed: { color: 'green', label: '已确认' },
+                        cancelled: { color: 'red', label: '已取消' },
+                      };
+                      const info = m[v] || { color: 'default', label: v };
+                      return <Tag color={info.color}>{info.label}</Tag>;
+                    },
+                  },
+                  { title: '参数缺口', dataIndex: 'param_gaps', width: 100, ellipsis: true,
+                    render: (v: any) => v ? JSON.stringify(v) : '-',
+                  },
+                  { title: 'Fallback', dataIndex: 'fallback_reason', width: 140, ellipsis: true },
+                  { title: '时间', dataIndex: 'created_at', width: 150,
+                    render: (v: string) => v?.slice(0, 19).replace('T', ' '),
+                  },
+                  {
+                    title: '操作', width: 80, fixed: 'right' as const,
+                    render: (_: any, record: ExecutionLogItem) => (
+                      <Button type="link" size="small" icon={<EyeOutlined />} onClick={async () => {
+                        try {
+                          const res = await getExecutionLogDetail(record.id);
+                          setDetailModal(res.data?.data);
+                        } catch { setDetailModal(record); }
+                      }}>详情</Button>
+                    ),
+                  },
+                ]}
+                dataSource={execLogs}
+                rowKey="id"
+                loading={loading}
+                size="small"
+                pagination={{
+                  current: page, total, pageSize: 20,
+                  onChange: setPage, showTotal: (t) => `共 ${t} 条`,
+                }}
+                scroll={{ x: 1200 }}
               />
             ),
           },

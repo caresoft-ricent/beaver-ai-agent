@@ -1,4 +1,4 @@
-"""管理后台 — 日志查询API（证据链 + 错误日志 + 操作日志）"""
+"""管理后台 — 日志查询API（证据链 + 错误日志 + 操作日志 + 执行日志）"""
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
@@ -6,6 +6,7 @@ from typing import Optional
 
 from app.database import get_db
 from app.models.chat import ActionLog, ChatMessage, ChatSession
+from app.models.execution_log import ExecutionLog
 from app.schemas.common import ResponseBase
 
 router = APIRouter()
@@ -170,3 +171,85 @@ def clear_logs(
         deleted += db.query(ChatMessage).delete(synchronize_session=False)
     db.commit()
     return ResponseBase(message=f"已清空 {deleted} 条日志")
+
+
+# ===== ExecutionLog (2.0) =====
+@router.get("/execution-logs")
+def list_execution_logs(
+    tenant_id: int = Query(1),
+    session_id: Optional[str] = Query(None),
+    domain_id: Optional[int] = Query(None),
+    success: Optional[bool] = Query(None),
+    confirm_status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    query = db.query(ExecutionLog)
+    if session_id:
+        query = query.filter(ExecutionLog.session_id == session_id)
+    if domain_id:
+        query = query.filter(ExecutionLog.domain_id == domain_id)
+    if success is not None:
+        query = query.filter(ExecutionLog.success == success)
+    if confirm_status:
+        query = query.filter(ExecutionLog.confirm_status == confirm_status)
+    total = query.count()
+    items = (
+        query.order_by(desc(ExecutionLog.created_at))
+        .offset((page - 1) * size).limit(size).all()
+    )
+    return ResponseBase(data={
+        "items": [
+            {
+                "id": log.id,
+                "session_id": log.session_id,
+                "conversation_id": log.conversation_id,
+                "user_input": log.user_input,
+                "domain_id": log.domain_id,
+                "action_id": log.action_id,
+                "adapter_id": log.adapter_id,
+                "input_params": log.input_params,
+                "output_data": log.output_data,
+                "success": log.success,
+                "error_message": log.error_message,
+                "duration_ms": log.duration_ms,
+                "param_gaps": log.param_gaps,
+                "fallback_reason": log.fallback_reason,
+                "confirm_status": log.confirm_status,
+                "created_at": log.created_at.isoformat() if log.created_at else None,
+            }
+            for log in items
+        ],
+        "total": total,
+    })
+
+
+@router.get("/execution-logs/{log_id}")
+def get_execution_log_detail(log_id: int, db: Session = Depends(get_db)):
+    from fastapi import HTTPException
+    log = db.query(ExecutionLog).filter(ExecutionLog.id == log_id).first()
+    if not log:
+        raise HTTPException(status_code=404, detail="执行日志不存在")
+    return ResponseBase(data={
+        "id": log.id,
+        "session_id": log.session_id,
+        "conversation_id": log.conversation_id,
+        "user_input": log.user_input,
+        "skill_id": log.skill_id,
+        "tool_id": log.tool_id,
+        "entity_id": log.entity_id,
+        "action_id": log.action_id,
+        "adapter_id": log.adapter_id,
+        "domain_id": log.domain_id,
+        "input_params": log.input_params,
+        "output_data": log.output_data,
+        "user_context": log.user_context,
+        "success": log.success,
+        "error_message": log.error_message,
+        "duration_ms": log.duration_ms,
+        "param_gaps": log.param_gaps,
+        "fallback_reason": log.fallback_reason,
+        "confirm_status": log.confirm_status,
+        "created_at": log.created_at.isoformat() if log.created_at else None,
+    })

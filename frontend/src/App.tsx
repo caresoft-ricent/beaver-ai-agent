@@ -16,6 +16,7 @@ import LogsPage from './pages/LogsPage';
 import NormalizationPage from './pages/NormalizationPage';
 import WorkflowPage from './pages/WorkflowPage';
 import YuanyangPage from './pages/YuanyangPage';
+import DomainList from './pages/DomainList';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = localStorage.getItem('token');
@@ -38,6 +39,7 @@ function App() {
             <Route path="tenants" element={<TenantList />} />
             <Route path="connectors" element={<ConnectorList />} />
             <Route path="llm" element={<LLMConfigList />} />
+            <Route path="domains" element={<DomainList />} />
             <Route path="ontology" element={<EntityList />} />
             <Route path="intents" element={<SkillList />} />
             <Route path="normalization" element={<NormalizationPage />} />

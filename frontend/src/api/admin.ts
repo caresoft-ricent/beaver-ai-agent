@@ -173,3 +173,29 @@ export const deleteNormalizationRule = (id: number) =>
 
 export const initNormalizationRules = (tenantId: number = 0) =>
   client.post('/admin/normalization/initialize', null, { params: { tenant_id: tenantId } });
+
+// Domains (2.0)
+export const getDomains = (params?: { tenant_id?: number; status?: string; keyword?: string; page?: number; page_size?: number }) =>
+  client.get('/admin/domains', { params });
+
+export const getDomain = (id: number) =>
+  client.get(`/admin/domains/${id}`);
+
+export const createDomain = (data: Record<string, unknown>) =>
+  client.post('/admin/domains', data);
+
+export const updateDomain = (id: number, data: Record<string, unknown>) =>
+  client.put(`/admin/domains/${id}`, data);
+
+export const deleteDomain = (id: number) =>
+  client.delete(`/admin/domains/${id}`);
+
+export const publishDomain = (id: number) =>
+  client.post(`/admin/domains/${id}/publish`);
+
+// Execution Logs (2.0)
+export const getExecutionLogs = (params?: { session_id?: string; domain_id?: number; success?: boolean; confirm_status?: string; page?: number; size?: number }) =>
+  client.get('/admin/logs/execution-logs', { params });
+
+export const getExecutionLogDetail = (id: number) =>
+  client.get(`/admin/logs/execution-logs/${id}`);

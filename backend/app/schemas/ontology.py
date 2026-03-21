@@ -12,6 +12,7 @@ class EntityCreate(BaseModel):
     category: Optional[str] = ""
     entity_description: Optional[str] = None
     connector_id: Optional[int] = None
+    domain_id: Optional[int] = None
 
 
 class EntityUpdate(BaseModel):
@@ -21,6 +22,7 @@ class EntityUpdate(BaseModel):
     category: Optional[str] = None
     entity_description: Optional[str] = None
     connector_id: Optional[int] = None
+    domain_id: Optional[int] = None
     status: Optional[str] = None
 
 
@@ -33,6 +35,7 @@ class EntityOut(BaseModel):
     category: Optional[str] = ""
     entity_description: Optional[str]
     connector_id: Optional[int]
+    domain_id: Optional[int] = None
     status: str
     version: int
     created_at: Optional[datetime]
@@ -149,6 +152,11 @@ class ActionCreate(BaseModel):
     response_description: Optional[str] = None
     cache_ttl: int = 0
     mock_response: Optional[dict] = None
+    # 2.0
+    domain_id: Optional[int] = None
+    action_type: str = "query"
+    risk_level: str = "low"
+    response_type: str = "table"
 
 
 class ActionUpdate(BaseModel):
@@ -166,6 +174,11 @@ class ActionUpdate(BaseModel):
     response_description: Optional[str] = None
     cache_ttl: Optional[int] = None
     mock_response: Optional[dict] = None
+    # 2.0
+    domain_id: Optional[int] = None
+    action_type: Optional[str] = None
+    risk_level: Optional[str] = None
+    response_type: Optional[str] = None
 
 
 class ActionOut(BaseModel):
@@ -185,6 +198,12 @@ class ActionOut(BaseModel):
     response_description: Optional[str] = None
     cache_ttl: int
     mock_response: Optional[dict] = None
+    # 2.0
+    domain_id: Optional[int] = None
+    action_type: Optional[str] = None
+    risk_level: Optional[str] = None
+    response_type: Optional[str] = None
+    discovery_status: Optional[str] = None
     created_at: Optional[datetime]
 
     model_config = {"from_attributes": True}
@@ -203,6 +222,12 @@ class ActionParameterCreate(BaseModel):
     is_required: bool = False
     default_value: Optional[str] = None
     value_type: str = "none"
+    # 2.0 映射
+    filter_type: Optional[str] = None
+    filter_condition: Optional[str] = None
+    value_mode: Optional[str] = None
+    agg_func: Optional[str] = None
+    sort_order: Optional[str] = None
 
 
 class ActionParameterUpdate(BaseModel):
@@ -217,6 +242,12 @@ class ActionParameterUpdate(BaseModel):
     is_required: Optional[bool] = None
     default_value: Optional[str] = None
     value_type: Optional[str] = None
+    # 2.0 映射
+    filter_type: Optional[str] = None
+    filter_condition: Optional[str] = None
+    value_mode: Optional[str] = None
+    agg_func: Optional[str] = None
+    sort_order: Optional[str] = None
 
 
 class ActionParameterOut(BaseModel):
@@ -233,5 +264,11 @@ class ActionParameterOut(BaseModel):
     is_required: bool = False
     default_value: Optional[str] = None
     value_type: str = "none"
+    # 2.0 映射
+    filter_type: Optional[str] = None
+    filter_condition: Optional[str] = None
+    value_mode: Optional[str] = None
+    agg_func: Optional[str] = None
+    sort_order: Optional[str] = None
 
     model_config = {"from_attributes": True}

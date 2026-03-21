@@ -18,6 +18,7 @@ import {
   SettingOutlined,
   ToolOutlined,
   SwapOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons';
 import { changePassword } from '../api/admin';
 
@@ -39,6 +40,7 @@ const menuItems = [
     icon: <RobotOutlined />,
     label: 'AI 配置',
     children: [
+      { key: '/domains', icon: <AppstoreOutlined />, label: '业务域' },
       { key: '/llm', icon: <RobotOutlined />, label: '大模型' },
       { key: '/ontology', icon: <ApartmentOutlined />, label: '业务本体' },
       { key: '/intents', icon: <ThunderboltOutlined />, label: '技能/意图' },
